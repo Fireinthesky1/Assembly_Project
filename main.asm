@@ -13,8 +13,8 @@
 
         .thumb
         .global main
-a_p: .word 0x20004F0 ; array pointer
-cnt: .equ 8          ; size of the array in bytes
+a_p: .word 0x20004F0  ; array pointer
+cnt: .equ 10          ; size of the array in bytes
 main:
         .asmfunc
     ; here we initialize the registers
@@ -32,7 +32,7 @@ loop_i:
         STRB R2, [R1], #1     ; *R1=R2, R1=R1+1 (1 byte further down)
         ADD R2, #3            ; R2=R2+3
         ADD R0, #1            ; increment R0 (the loop index)
-        CMP R0, #8            ; how do I use the constant cnt here?
+        CMP R0, #cnt
         BNE loop_i
 
     ; here we reset the register for the sum loop
@@ -44,7 +44,7 @@ loop_s:
         ADD R3, R1            ; R3 = *R1
         ADD R1, #1            ; R1 = R1 + 1
         ADD R0, #1            ; increment loop index
-        CMP R0, #8            ; how do I use the constant cnt here?
+        CMP R0, #cnt
         BNE loop_s
 
         .endasmfunc
