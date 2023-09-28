@@ -13,7 +13,7 @@
 
         .thumb
         .global main
-a_p: .word 0x20004F0  ; array pointer
+a_p: .word 0x200004F0 ; array pointer
 cnt: .equ 10          ; size of the array in bytes
 main:
         .asmfunc
@@ -37,15 +37,17 @@ loop_i:
 
     ; here we reset the register for the sum loop
         LDR R1, a_p           ; store the array pointer into R1 again
-        AND R0, #0            ; reset the loop index
+        AND R0, #0            ; clear loop index
+        AND R2, #0	      ; clear R2
 
     ; this loop calculates the sum
 loop_s:
-        ADD R3, R1            ; R3 = *R1
+	LDRB R2, [R1]	      ; load the value pointed to by R1 into R2
+        ADD R3, R2            ; add R2 to R3
         ADD R1, #1            ; R1 = R1 + 1
         ADD R0, #1            ; increment loop index
         CMP R0, #cnt
         BNE loop_s
-
+    ; R3 now holds 0x000000EB
         .endasmfunc
         .end
