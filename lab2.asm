@@ -11,38 +11,56 @@
 ; set 3rd bit of GPIODIR (1 out)
 ; set 3rd bit of GPIODEN (1 Digital functions enabled)
 
-; NEED TO FIGURE OUT HOW TO READ FROM GPIO REGISTERS TO DEBUG
-
         .thumb
         .global main
-RCGCGPIO:  .field 0x400FE000    ; Base address for RCGCGPIO
-GPIO:      .field 0x40025000    ; Base address for GPIO Port F APB
-oRCGCGPIO: .equ 0x608           ; offset for RCGCGPIO
-oGPIODIR:  .equ 0x400           ; offset for GPIODIR
-oGPIODEN:  .equ 0x51C           ; offset for GPIODEN
+SYSCTL_RCGCGPIO_R: .field 0x400FE608   ; RCGCGPIO_R (340 data sheet)
+GPIO_PORTF_DATA_R: .field 0x40025020   ; Base is 0x40025000 offset is 0x020
+GPIO_PORTF_DIR_R: .field 0x40025400    ; DIR_R GPIO Port F APB (153 book)
+GPIO_PORTF_DEN_R: .field 0x4002551C    ; DEN_R GPIO Port F APB (153 book)
 
 main:
         .asmfunc
 
-        AND R0, #0              ; clear R0
-        AND R1, #0              ; clear R1
+    ; CLEAR REGISTERS
+        AND R0, #0                ; clear R0 (addresses)
+        AND R1, #0                ; clear R1 (bits to store)
 
-        LDR R0, RCGCGPIO        ; base address for RCGCGPIO
-        MOV R1, #0x10           ; 5th bit high
-        STR R1, [R0, #oRCGCGPIO]; enables the clock to port F
-        NOP                     ; time for the clock to finish
+    ; ENABLE CLOCK TO PORT F (340 data sheet)
+        LDR R0, SYSCTL_RCGCGPIO_R ; load RCGCGPIO_R into R0
+        LDR R1, [R0]              ; load what's at RCGCGPIO_R into R1
+        ORR R1, #0x20             ; set the 5th bit high
+        STR R1, [R0]              ; stores modded bits into RCGCGPIO_R
+        NOP                       ; time for the clock to finish
         NOP
 
+    ; CLEAR REGISTERS
+        AND R0, #0                ; clear R0
+        AND R1, #0                ; clear R1
 
-        AND R1, #0              ; clear R1
+    ; SET DIRECTION (663 data sheet)
+        LDR R0, GPIO_PORTF_DIR_R  ; load DIR_R address into R0
+        LDR R1, [R0]              ; loads what's at DIR_R into R1
+        ORR R1, #0x08             ; set the 3rd bit high
+        STR R1, [R0]              ; stores modified DIR_R bits into DIR_R
 
-        LDR R0, GPIO            ; base address for GPIO
-        MOV R1, #0x4            ; 3rd bit of R1 high
-        STR R1, [R0, #oGPIODIR] ; sets 3rd pin to output
+    ; CLEAR REGISTERS
+        AND R0, #0                ; clear R0
+        AND R1, #0                ; clear R1
 
-        STR R1, [R0, #oGPIODEN] ; enables digital IO on 3rd pin [THIS CAUSES A FAULT]
+    ; SET DIGITAL ENABLE (682 data sheet)
+        LDR R0, GPIO_PORTF_DEN_R  ; load DEN_R address into R0
+        LDR R1, [R0]              ; load what's at DEN_r into R1
+        ORR R1, #0x08             ; sets the 3rd bit high
+        STR R1, [R0]              ; stores modified DEN_R bits into DEN_R
 
-        STR R1, [R0, #0x003]    ; sets 3rd pin high
+    ; CLEAR REGISTERS
+        AND R0, #0                ; clear R0
+        AND R1, #0                ; clear R1
+
+    ; SET DATA (662 data sheet)
+        LDR R0, GPIO_PORTF_DATA_R
+        MOV R1, #0x08
+        STR R1, [R0]
 
 loop:   MOV R0, R0
         B loop
