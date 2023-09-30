@@ -1,4 +1,4 @@
-; James Hicks Sept 27
+; James Hicks Sept 27 2023
 
 ; 1) Increment the pointer
 ; 2) Store the number
@@ -38,11 +38,11 @@ loop_i:
     ; here we reset the register for the sum loop
         LDR R1, a_p           ; store the array pointer into R1 again
         AND R0, #0            ; clear loop index
-        AND R2, #0	      ; clear R2
+        AND R2, #0            ; clear R2
 
     ; this loop calculates the sum
 loop_s:
-	LDRB R2, [R1]	      ; load the value pointed to by R1 into R2
+        LDRB R2, [R1]         ; load the value pointed to by R1 into R2
         ADD R3, R2            ; add R2 to R3
         ADD R1, #1            ; R1 = R1 + 1
         ADD R0, #1            ; increment loop index
