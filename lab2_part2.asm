@@ -2,15 +2,15 @@
 
         .thumb
         .global main
-SYSCTL_RCGCGPIO_R: .field 0x400FE608   ; RCGCGPIO_R (340 data sheet)
-GPIO_PORTF_LOCK_R: .field 0x40025520   ; LOCK_R (684 data sheet)
-GPIO_UNLOCK_CODE: .field 0x4C4F434B    ; unlock code for CR (684 datasheet)
-GPIO_PORTF_CR_R: .field 0x40025524     ; COMMIT Register (685 data sheet)
-GPIO_PORTF_DIR_R: .field 0x40025400    ; DIR_R GPIO Port F APB (153 book)
-GPIO_PORTF_PUR_R: .field 0x40025510    ; PUR_R GPIO Port F APB (153 book)
-GPIO_PORTF_DEN_R: .field 0x4002551C    ; DEN_R GPIO Port F APB (153 book)
-oDATA_READ: .field 0x40025040          ; base is 0x40025000 offset is 0x040
-oDATA_WRITE: .field 0x40025020         ; base is 0x40025000 offset is 0x020
+SYSCTL_RCGCGPIO_R: .field 0x400FE608 ; RCGCGPIO_R (340 data sheet)
+GPIO_PORTF_LOCK_R: .field 0x40025520 ; LOCK_R (684 data sheet)
+GPIO_UNLOCK_CODE:  .field 0x4C4F434B ; unlock code for CR (684 datasheet)
+GPIO_PORTF_CR_R:   .field 0x40025524 ; COMMIT Register (685 data sheet)
+GPIO_PORTF_DIR_R:  .field 0x40025400 ; DIR_R GPIO Port F APB (153 book)
+GPIO_PORTF_PUR_R:  .field 0x40025510 ; PUR_R GPIO Port F APB (153 book)
+GPIO_PORTF_DEN_R:  .field 0x4002551C ; DEN_R GPIO Port F APB (153 book)
+oDATA_READ:        .field 0x40025040 ; base is 0x40025000 offset is 0x040
+oDATA_WRITE:       .field 0x40025020 ; base is 0x40025000 offset is 0x020
 
 main:
         .asmfunc
