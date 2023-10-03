@@ -114,4 +114,13 @@ SHIFT_LEFT:
         B DISPLAY
 
         .endasmfunc
+        .align
+
+wait:   .asmfunc
+
+waitLoop:
+        BEQ waitLoop
+        BX LR
+
+        .endasmfunc
         .end
