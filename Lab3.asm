@@ -7,8 +7,6 @@ GPIO_UNLOCK_CODE:       .field      0x4C4F434B  ; (pg 684)
 SYSCTRL_RCGCGPIO_R:     .field      0x400FE608  ; (pg 340)
 SYSCTRL_RCC_R           .field      0x400FE060  ; (pg 254)
 
-GPIO_PORTB_LOCK_R:      .field      0x40005520  ; (pg 684)
-GPIO_PORTB_CR:          .field      0x40005524  ; (pg 685)
 GPIO_PORTB_DIR_R:       .field      0x40005400  ; (pg 663)
 GPIO_PORTB_DR4R_R:      .field      0x40005504  ; (pg 674)
 GPIO_PORTB_DEN_R:       .field      0x4000551C  ; (pg 682)
@@ -40,14 +38,6 @@ main:
         AND     R0, #0
         AND     R1, #0
 
-    ; UNLOCK GPIO PORT B
-        LDR     R0, GPIO_PORTB_LOCK_R
-        LDR     R1, GPIO_UNLOCK_CODE
-        STR     R1, [R0]
-
-        AND     R0, #0
-        AND     R1, #0
-
     ; UNLOCK GPIO PORT F
         LDR     R0, GPIO_PORTF_LOCK_R
         LDR     R1, GPIO_UNLOCK_CODE
@@ -56,14 +46,7 @@ main:
         AND     R0, #0
         AND     R1, #0
 
-    ; ENABLE COMMIT FOR PORT B, F
-        LDR     R0, GPIO_PORTB_CR
-        LDR     R1, [R0]
-        ORR     R1, #0x0F                       ; enable commit for pin 0-4
-        STR     R1, [R0]
-
-        AND     R0, #0
-        AND     R1, #0
+    ; ENABLE COMMIT FOR PORT F
 
         LDR     R0, GPIO_PORTF_CR
         LDR     R1, [R0]
@@ -100,7 +83,7 @@ main:
         AND     R0, #0
         AND     R1, #0
 
-    ; SET DIGITAL ENABLE (PB0-4, PF0, PF4) <- CHECK THIS
+    ; SET DIGITAL ENABLE (PB0-4, PF0, PF4)
         LDR     R0, GPIO_PORTB_DEN_R
         LDR     R1, [R0]
         ORR     R1, #0x0F                       ; enable for pin 0-4
@@ -128,7 +111,7 @@ main:
         AND     R1, #0
         AND     R2, #0
 
-DISPLAY: ; check with prof to see if this works
+DISPLAY:
         LDR     R1, oDATA_WRITE                 ; load address for writing
         UBFX    R2, R0, #0, #4                  ; unsigned bitfield extract
         STR     R2, [R1]
