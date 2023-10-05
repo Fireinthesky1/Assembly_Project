@@ -21,7 +21,7 @@ oDATA_READ_SW1:         .field      0x40025040  ; (pg 662) bit 4
 oDATA_READ_SW2:         .field      0x40025004  ; (pg 662) bit 0
 oDATA_WRITE:            .field      0x4000503C  ; (pg 662) bit 0-4
 
-NEITHER_PRESSED:        .equ        0x00010001
+NEITHER_PRESSED:        .equ        0x00000011
 
 main:
         .asmfunc
@@ -47,7 +47,6 @@ main:
         AND     R1, #0
 
     ; ENABLE COMMIT FOR PORT F
-
         LDR     R0, GPIO_PORTF_CR
         LDR     R1, [R0]
         ORR     R1, #0x11                       ; enable commit for pin 0,4
@@ -56,7 +55,7 @@ main:
         AND     R0, #0
         AND     R1, #0
 
-    ; SET DIRECTION (PB0-4 outputs)
+    ; SET DIRECTION (PB0-PB4 outputs)
         LDR     R0, GPIO_PORTB_DIR_R
         LDR     R1, [R0]
         ORR     R1, #0x0F                       ; set PB0-4 as output
@@ -106,10 +105,18 @@ main:
         EOR     R1, #0x30                       ; set bit 5 and 4 to 0
         STR     R1, [R0]
 
-    ; CLEAR R1 AND INITIALIZE R0 FOR DISPLAY
+    ; USE 16 MHz CLOCK
+        LDR     R0, SYSCTRL_RCC_R
+        LDR     R1, [R0]
+        ORR     R1, #0x540
+        BIC     R1, #0x0280
+        STR     R1, [R0]
+
+    ; CLEAR R1, R2, R3 AND INITIALIZE R0 FOR DISPLAY
         AND     R0, #0
         AND     R1, #0
         AND     R2, #0
+        AND     R3, #0
 
 DISPLAY:
         LDR     R1, oDATA_WRITE                 ; load address for writing
@@ -129,7 +136,7 @@ POLL_SWITCHES:
         LDR     R2, [R1]
         EOR     R3, R2, #NEITHER_PRESSED
         CMP     R3, #0
-        BLNE    wait                            ; if either wait
+        BEQ     POLL_SWITCHES
         CMP     R3, #1
         BEQ     SHIFT_LEFT                      ; if sw2 shift
         CMP     R3, #0x10
@@ -137,14 +144,16 @@ POLL_SWITCHES:
         B       POLL_SWITCHES
 
 COMPLEMENT:
+        BL      wait
         MOVT    R1, #0xFFFF
         MOVB    R1, #0xFFFF
         EOR     R0, R1
         B DISPLAY
 
 SHIFT_LEFT:
+        BL      wait
         LSL     R0, R0, #1
-        ORR     R0, #0x1
+        ORR     R0, #1
         B DISPLAY
 
         .endasmfunc
@@ -157,7 +166,6 @@ SHIFT_LEFT:
 STCTRL:     .field      0xE000E010              ; (pg 138)
 STRELOAD:   .field      0xE000E014              ; (pg 140)
 STCURRENT:  .field      0xE000E018              ; (pg 141)
-COUNTFLAG:  .field      0x00010000              ; (pg 138)
 
 wait:
         .asmfunc
@@ -185,7 +193,7 @@ wait:
         AND     R5, #0
 
     ; SET STRELOAD TO 0x27100
-    ; be careful here ORR r5, R6 might now be correct
+    ; be careful here ORR r5, R6 might not be correct
         LDR     R4, STRELOAD
         LDR     R5, [R4]
         MOVT    R6, #0x0002
@@ -213,13 +221,13 @@ wait:
 
         AND     R4, #0
         AND     R5, #0
-        LDR     R6, COUNTFLAG
 
 waitLoop:
         LDR     R4, STCTRL
         LDR     R5, [R4]
-        CMP     R5, R6
-        BEQ     waitLoop                        ; If not Countflag waitloop
+        MOVS    R5, R5, LSR #16                 ; just look at the 16th bit
+        CMP     R5, #1
+        BNE     waitLoop                        ; If not bit 16
         BX LR
 
         .endasmfunc

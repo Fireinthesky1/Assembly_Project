@@ -55,12 +55,12 @@ int init()
           "         LDR         R0, GPIO_PORTB_DEN_R\n"
           "         LDR         R1, [R0]\n"
           "         ORR         R1, #0xF\n"
-          "         STR         R1, [R0]"
+          "         STR         R1, [R0]");
 
     // SET DIGITAL ENABLE (PF0, PF4)
     __asm("         AND         R0, #0\n"
           "         AND         R1, #0\n"
-          "         LDR         R0, GPIO_PORTB_DEN_F\n"
+          "         LDR         R0, GPIO_PORTF_DEN_R\n"
           "         LDR         R1, [R0]\n"
           "         ORR         R1, #0x11\n"
           "         STR         R1, [R0]");

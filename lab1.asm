@@ -49,5 +49,7 @@ loop_s:
         CMP         R0, #cnt
         BNE         loop_s
     ; R3 now holds 0x000000EB
+loop:	mov			R0, R0
+		B			loop
         .endasmfunc
         .end
