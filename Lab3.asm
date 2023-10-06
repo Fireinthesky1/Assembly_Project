@@ -21,7 +21,11 @@ oDATA_READ_SW1:         .field      0x40025040  ; (pg 662) bit 4
 oDATA_READ_SW2:         .field      0x40025004  ; (pg 662) bit 0
 oDATA_WRITE:            .field      0x4000503C  ; (pg 662) bit 0-4
 
+; FOUR STATES OF STATE MACHINE
 NEITHER_PRESSED:        .equ        0x00000011
+ONLY_SW1_PRESSED:       .equ        0x00000001
+ONLY_SW2_PRESSED:       .equ        0x00000010
+
 
 main:
         .asmfunc
@@ -105,7 +109,7 @@ main:
         EOR     R1, #0x30                       ; set bit 5 and 4 to 0
         STR     R1, [R0]
 
-    ; USE 16 MHz CLOCK
+    ; USE 16 MHz CLOCK (set bits 10-6 to 0x15)
         LDR     R0, SYSCTRL_RCC_R
         LDR     R1, [R0]
         ORR     R1, #0x540
@@ -119,42 +123,45 @@ main:
         AND     R3, #0
 
 DISPLAY:
-        LDR     R1, oDATA_WRITE                 ; load address for writing
-        UBFX    R2, R0, #0, #4                  ; unsigned bitfield extract
+        BL      wait                            ; WAIT
+        LDR     R1, oDATA_WRITE                 ; DISPLAY OUTPUT
+        UBFX    R2, R0, #0, #4
         STR     R2, [R1]
-        AND     R1, #0
-        AND     R2, #0
-        B POLL_SWITCHES
-
-; R2 holds the combined switch data
-; R3 holds the result of the XOR
-; If neither are pressed: 0x11
-; If SW1 is pressed: 0x01
-; If SW2 is pressed: 0x10
-POLL_SWITCHES:
+DLOOP:                                          ; HANDLE STATE TRANSITIONS
         LDR     R1, oDATA_READ_BOTH
         LDR     R2, [R1]
-        EOR     R3, R2, #NEITHER_PRESSED
-        CMP     R3, #0
-        BEQ     POLL_SWITCHES
-        CMP     R3, #1
-        BEQ     SHIFT_LEFT                      ; if sw2 shift
-        CMP     R3, #0x10
-        BEQ     COMPLEMENT                      ; if sw1 complement
-        B       POLL_SWITCHES
+        CMP     R2, #ONLY_SW1_PRESSED
+        BEQ     FLIP
+        CMP     R2, #ONLY_SW2_PRESSED
+        BEQ     SHIFT
+        B       DLOOP
 
-COMPLEMENT:
-        BL      wait
-        MOVT    R1, #0xFFFF
+FLIP:
+        BL      wait                            ; WAIT
+        MOVT    R1, #0xFFFF                     ; UPDATE OUTPUT
         MOVB    R1, #0xFFFF
         EOR     R0, R1
-        B DISPLAY
+FLOOP:                                          ; HANDLE STATE TRANSITIONS
+        LDR     R1, oDATA_READ_BOTH
+        LDR     R2, [R1]
+        CMP     R2, #NEITHER_PRESSED
+        BEQ     DISPLAY
+        CMP     R2, #ONLY_SW2_PRESSED
+        BEQ     SHIFT
+        B       FLOOP
 
-SHIFT_LEFT:
-        BL      wait
-        LSL     R0, R0, #1
+SHIFT:
+        BL      wait                            ; WAIT
+        LSL     R0, R0, #1                      ; UPDATE OUTPUT
         ORR     R0, #1
-        B DISPLAY
+SLOOP:                                          ; HANDLE STATE TRANSITIONS
+        LDR     R1, oDATA_READ_BOTH
+        LDR     R2, [R1]
+        CMP     R2, #NEITHER_PRESSED
+        BEQ     DISPLAY
+        CMP     R2, #ONLY_SW1_PRESSED
+        BEQ     FLIP
+        B       SLOOP
 
         .endasmfunc
         .align
