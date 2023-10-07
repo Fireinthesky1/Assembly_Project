@@ -4,11 +4,13 @@
 #include <stdint.h>
 #include <inc/hw_memmap.h>
 #include <driverlib/gpio.h>
+#include <driverlib/sysctl.h>
 
-// (pg 682 ds)
-    __asm("GPIO_PORTB_DEN_R:       .field      0x4000551C\n");
+const uint32_t only_sw1 = 0x00000001;
+const uint32_t only_sw2 = 0x00000010;
+const uint32_t neither  = 0x00000011;
+const uint32_t both     = 0x00000000;
 
-// return 0 on success
 // set up guards for bad initialization
 int init()
 {
@@ -28,12 +30,12 @@ int init()
     GPIOUnlockPin(GPIO_PORTF_BASE, GPIO_PIN_4);
 
     // SET DIRECTIONS (PB0-PB4, PF0, PF4)
-    GPIOPinTypeGPIOInput(GPIO_PORTA_BASE,
+    GPIOPinTypeGPIOInput(GPIO_PORTB_BASE,
                          GPIO_PIN_0 | GPIO_PIN_1 |
                          GPIO_PIN_2 | GPIO_PIN_3);
 
     GPIOPinTypeGPIOOutput(GPIO_PORTF_BASE,
-                          GPIO_PIN_0, GPIO_PIN_4);
+                          GPIO_PIN_0 |GPIO_PIN_4);
 
     // SET DRIVE STRENGTH (PB0-PB4) (pg 266 tw)
     GPIOPadConfigSet(GPIO_PORTB_BASE,
@@ -50,7 +52,8 @@ int init()
 
     // ENABLE MOSC FOR SYSTEM CLOCK (pg 254 ds)
     // Do I need to choose the crystal?
-    SysCtlClockSet(SYSCTL_USE_OSC | SYSCTL_OSC_MAIN);
+    SysCtlClockSet(SYSCTL_USE_OSC | SYSCTL_OSC_MAIN |
+                   SYSCTL_XTAL_16MHZ);
 
 return 0;
 
@@ -62,42 +65,84 @@ void wait()
     // 3 cycles per delay
     uint32_t num_calls = 53333;
     SysCtlDelay(num_calls);
-    return 0;
 }
 
-void flip(bool flip, uint32_t *number_to_display)
+// this function returns 3
+uint32_t flip(uint32_t *number_to_display)
 {
     wait();
-    if(flip)
-    {
-        *number_to_display = ~(*number_to_display);
-    }
-    uint32 state = GPIOPinRead(GPIO_PORTF_BASE,
-                               GPIO_PIN_0 | GPIO_PIN_4);
-    return 0;
+    *number_to_display = (*number_to_display) ^ 0xFFFFFFFF;
+    return 3;
 }
 
-void shift(uint32_t *number_to_display)
-{
-    
-}
-
-void display(uint32_t *number_to_display)
+// This function returns 2
+uint32_t shift(uint32_t *number_to_display)
 {
     wait();
-    GPIOPinWrite();
+    *number_to_display = (*number_to_display) << 1; // hopefully this works
+    *number_to_display = *number_to_display | 0x00000001;
+    return 2;
+}
+
+// This function returns 1
+uint32_t display(uint32_t *number_to_display)
+{
+    wait();
+    uint8_t val = *number_to_display & 0x000000FF;   // hopefully this works
+    GPIOPinWrite(GPIO_PORTB_BASE,
+                 GPIO_PIN_0 | GPIO_PIN_1 |
+                 GPIO_PIN_2 | GPIO_PIN_3,
+                 val);
+    return 1;
 }
 
 int main(void)
 {
     init();
-    uint_32 number_to_display = 0;
-    uint_32 state = GPIOPinRead(GPIO_PORTF_BASE,
-                                GPIO_PIN_0 | GPIO_PIN_4);
-    const uint_32 only_sw1 = 
-    const uint_32 only_sw2 =
-    const uint_32 neither = 
-    const uint_32 both = 
+    uint32_t number_to_display = 0;
+    uint32_t input;
+    uint32_t state = display(&number_to_display); // start in display state
+    while(1)
+    {
+        input = GPIOPinRead(GPIO_PORTF_BASE,
+                            GPIO_PIN_0 | GPIO_PIN_4);
+        switch (state)
+        {
+            case 1: // display state
+                if (input == only_sw1)
+                {
+                    state = flip(&number_to_display);
+
+                }
+                else if (input == only_sw2)
+                {
+                    state = flip(&number_to_display);
+                }
+                break;
+            case 2: // shift state
+                if (input == neither)
+                {
+                    state = display(&number_to_display);
+                }
+                else if (input == only_sw1)
+                {
+                    state = flip(&number_to_display);
+                }
+                break;
+            case 3: // flip state
+                if (input == neither)
+                {
+                    state = display(&number_to_display);
+                }
+                else if (input == only_sw2)
+                {
+                    state = shift(&number_to_display);
+                }
+                break;
+            default: // something's wrong if we're here
+                break;
+        }
+    }
 
     return 0;
 }
