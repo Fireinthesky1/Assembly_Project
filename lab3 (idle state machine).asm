@@ -126,6 +126,7 @@ DISPLAY:
         STR     R2, [R1]
 
 IDLE:                                           ; HANDLE STATE TRANSITIONS
+        BL      wait                            ; WAIT
         LDR     R1, oDATA_READ_BOTH
         LDR     R2, [R1]
         CMP     R2, #ONLY_SW1_PRESSED
@@ -143,6 +144,7 @@ FLIP:
         UBFX    R2, R0, #0, #4
         STR     R2, [R1]
 FLOOP:                                          ; HANDLE STATE TRANSITIONS
+        BL      wait                            ; WAIT
         LDR     R1, oDATA_READ_BOTH
         LDR     R2, [R1]
         CMP     R2, #NEITHER_PRESSED            ; IF NEITHER IDLE
@@ -159,6 +161,7 @@ IN_FLIP_DO_SHIFT:
         UBFX    R2, R0, #0, #4
         STR     R2, [R1]
 IFLOOP:                                         ; HANDLE STATE TRANSITIONS
+        BL      wait                            ; WAIT
         LDR     R1, oDATA_READ_BOTH
         LDR     R2, [R1]
         CMP     R2, #NEITHER_PRESSED            ; IF NEITHER IDLE
@@ -177,6 +180,7 @@ SHIFT:
         UBFX    R2, R0, #0, #4
         STR     R2, [R1]
 SLOOP:                                          ; HANDLE STATE TRANSITIONS
+        BL      wait                            ; WAIT
         LDR     R1, oDATA_READ_BOTH
         LDR     R2, [R1]
         CMP     R2, #NEITHER_PRESSED            ; IF NEITHER IDLE
@@ -194,6 +198,7 @@ IN_SHIFT_DO_FLIP:
         UBFX    R2, R0, #0, #4
         STR     R2, [R1]
 ISLOOP:                                         ; HANDLE STATE TRANSITIONS
+        BL      wait                            ; WAIT
         LDR     R1, oDATA_READ_BOTH
         LDR     R2, [R1]
         CMP     R2, #NEITHER_PRESSED            ; IF NEITHER IDLE
