@@ -6,10 +6,10 @@
 #include <driverlib/gpio.h>
 #include <driverlib/sysctl.h>
 
-const uint32_t only_sw1 = 0x00000001;
-const uint32_t only_sw2 = 0x00000010;
-const uint32_t neither  = 0x00000011;
-const uint32_t both     = 0x00000000;
+#define only_sw1 0x00000001
+#define only_sw2 0x00000010
+#define neither  0x00000011
+#define both     0x00000000
 
 // set up guards for bad initialization
 int init()
@@ -61,13 +61,13 @@ return 0;
 
 uint8_t extract_bottom_8_bits(uint32_t val)
 {
-  uint8_t result = (uint8_t)(value & oxFF);
+  uint8_t result = (uint8_t)(val & 0xFF);
   return result;
 }
 
 void write(uint32_t* number_to_display)
 {
-  val_to_write = extract_bottom_8_bits(*number_to_display);
+  uint8_t val_to_write = extract_bottom_8_bits(*number_to_display);
   GPIOPinWrite(GPIO_PORTB_BASE,
                GPIO_PIN_0 | GPIO_PIN_1 |
                GPIO_PIN_2 | GPIO_PIN_3,
@@ -105,11 +105,9 @@ uint32_t idle(uint32_t input, uint32_t* number_to_display)
   case only_sw1:
     flip(number_to_display);
     return 2; // flip read
-    break;
   case only_sw2:
     shift(number_to_display);
     return 4; // shift read
-    break;
   default:
     return 1; // stay in idle
   }
@@ -123,14 +121,11 @@ uint32_t fread(uint32_t input, uint32_t* number_to_display)
   {
   case neither:
     return 1; // idle
-    break;
   case both:
     shift(number_to_display);
     return 3; // in flip do shift read
-    break;
   default:
     return 2; // stay in flip read
-    break;
   }
 }
 
@@ -142,16 +137,12 @@ uint32_t ifread(uint32_t input)
   {
   case neither:
     return 1; // idle
-    break;
   case only_sw1:
     return 2; // flip read
-    break;
   case only_sw2:
     return 4; // shift read
-    break;
   default:
-    return 3; // stay in "in flip do shift read"
-    break;
+    return 3; // stay in "in flip do shift read" 
   }
 }
 
@@ -163,13 +154,11 @@ uint32_t sread(uint32_t input, uint32_t *number_to_display)
   {
   case neither:
     return 1; // idle
-    break;
   case both:
-    flip()
+    flip(number_to_display);
     return 5; // in shift do flip read
   default:
     return 4; // stay in shift read
-    break;
   }
 }
 
@@ -181,13 +170,10 @@ uint32_t isread(uint32_t input)
   {
   case neither:
     return 1; // idle
-    break;
   case only_sw1:
     return 2; // flip read
-    break;
-  case only_sw1:
+  case only_sw2:
     return 4; // shift read
-    break;
   default:
     return 5; // stay in "in shift do flip read"
   }
@@ -204,25 +190,24 @@ int main(void)
     {
       switch (state)
         {
-         case 1: // idle
+        case 1: // idle
          state = idle(input, &number_to_display);
          break;
-         case 2: // flip read
-         state = fread(input, &number_to_display);
-         break;
-         case 3: // in flip do shift read
-         state = ifread(input);
-         break;
-         case 4: // shift read
-         state = sread(input, &number_to_display);
-         break;
-         case 5: // in shift do flip read
-         state = isread(input);
-         break;
+        case 2: // flip read
+           state = fread(input, &number_to_display);
+           break;
+        case 3: // in flip do shift read
+           state = ifread(input);
+           break;
+        case 4: // shift read
+           state = sread(input, &number_to_display);
+           break;
+        case 5: // in shift do flip read
+           state = isread(input);
+           break;
          default: // ERROR IN STATE MACHINE
-         return 1;
-         break;
-      }
+           return 1;
+        }
       input = GPIOPinRead(GPIO_PORTF_BASE,
                           GPIO_PIN_0 | GPIO_PIN_4);
     }

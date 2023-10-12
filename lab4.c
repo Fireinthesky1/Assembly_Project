@@ -190,24 +190,24 @@ int main(void)
     {
       switch (state)
         {
-	case 1: // idle
+        case 1: // idle
          state = idle(input, &number_to_display);
-	 break;
-	case 2: // flip read
-	   state = fread(input, &number_to_display);
-	   break;
-	case 3: // in flip do shift read
-	   state = ifread(input);
-	   break;
-	case 4: // shift read
-	   state = sread(input, &number_to_display);
-	   break;
-	case 5: // in shift do flip read
-	   state = isread(input);
-	   break;
+         break;
+        case 2: // flip read
+           state = fread(input, &number_to_display);
+           break;
+        case 3: // in flip do shift read
+           state = ifread(input);
+           break;
+        case 4: // shift read
+           state = sread(input, &number_to_display);
+           break;
+        case 5: // in shift do flip read
+           state = isread(input);
+           break;
          default: // ERROR IN STATE MACHINE
-	   return 1;
-	}
+           return 1;
+        }
       input = GPIOPinRead(GPIO_PORTF_BASE,
                           GPIO_PIN_0 | GPIO_PIN_4);
     }
