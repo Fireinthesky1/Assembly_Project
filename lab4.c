@@ -14,7 +14,7 @@
 // set up guards for bad initialization
 int init()
 {
-    // ENABLE CLOCK TO PORT B
+    // ENABLE CLOCK TO PORT B 
     SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOB);
     while (!SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOB))
     {
@@ -26,16 +26,23 @@ int init()
     {
     }
 
-    // UNLOCK PIN PF4 (SW2) <= Does this also enable commit?
-    GPIOUnlockPin(GPIO_PORTF_BASE, GPIO_PIN_4);
-
     // SET DIRECTIONS (PB0-PB4, PF0, PF4)
-    GPIOPinTypeGPIOInput(GPIO_PORTB_BASE,
-                         GPIO_PIN_0 | GPIO_PIN_1 |
-                         GPIO_PIN_2 | GPIO_PIN_3);
+    GPIOPinTypeGPIOOutput(GPIO_PORTB_BASE,
+                          GPIO_PIN_0 | GPIO_PIN_1 |
+                          GPIO_PIN_2 | GPIO_PIN_3);
 
-    GPIOPinTypeGPIOOutput(GPIO_PORTF_BASE,
-                          GPIO_PIN_0 |GPIO_PIN_4);
+    GPIOPinTypeGPIOInput(GPIO_PORTF_BASE,
+                         GPIO_PIN_0 | GPIO_PIN_4);
+
+    // UNLOCK PIN PF4 (SW1,SW2)
+    GPIOUnlockPin(GPIO_PORTF_BASE,
+                  GPIO_PIN_0 | GPIO_PIN_4);
+
+    // ENABLE PUR (PF0, PF4) (pg 266 tw)
+    GPIOPadConfigSet(GPIO_PORTF_BASE,
+                     GPIO_PIN_0 | GPIO_PIN_4,
+                     GPIO_STRENGTH_2MA,
+                     GPIO_PIN_TYPE_STD_WPU);
 
     // SET DRIVE STRENGTH (PB0-PB4) (pg 266 tw)
     GPIOPadConfigSet(GPIO_PORTB_BASE,
@@ -43,12 +50,6 @@ int init()
                      GPIO_PIN_2 | GPIO_PIN_3,
                      GPIO_STRENGTH_4MA,
                      GPIO_PIN_TYPE_STD);
-
-    // ENABLE PUR (PF0, PF4) (pg 266 tw)
-    GPIOPadConfigSet(GPIO_PORTF_BASE,
-                     GPIO_PIN_0 | GPIO_PIN_4,
-                     GPIO_STRENGTH_2MA,
-                     GPIO_PIN_TYPE_STD_WPU);
 
     // ENABLE MOSC FOR SYSTEM CLOCK (pg 254 ds)
     // Do I need to choose the crystal?
@@ -59,19 +60,19 @@ return 0;
 
 }
 
-uint8_t extract_bottom_8_bits(uint32_t val)
+/* uint8_t extract_bottom_8_bits(uint32_t val)
 {
   uint8_t result = (uint8_t)(val & 0xFF);
   return result;
-}
+} */
 
 void write(uint32_t* number_to_display)
 {
-  uint8_t val_to_write = extract_bottom_8_bits(*number_to_display);
+  //uint8_t val_to_write = extract_bottom_8_bits(*number_to_display);
   GPIOPinWrite(GPIO_PORTB_BASE,
                GPIO_PIN_0 | GPIO_PIN_1 |
                GPIO_PIN_2 | GPIO_PIN_3,
-               val_to_write);
+               *number_to_display);
 }
 
 void wait()
@@ -86,14 +87,16 @@ void wait()
 void flip(uint32_t* number_to_display)
 {
   wait();
-  *number_to_display = (*number_to_display) ^ 0xFFFFFFFF;
+  *number_to_display ^=  0xFFFFFFFF;
+  write(number_to_display);
 }
 
 void shift(uint32_t* number_to_display)
 {
   wait();
   *number_to_display = (*number_to_display) << 1;
-  *number_to_display = *number_to_display | 0x00000001;
+  *number_to_display |= 0x00000001;
+  write(number_to_display);
 }
 
 // state 1
@@ -191,8 +194,8 @@ int main(void)
       switch (state)
         {
         case 1: // idle
-         state = idle(input, &number_to_display);
-         break;
+           state = idle(input, &number_to_display);
+           break;
         case 2: // flip read
            state = fread(input, &number_to_display);
            break;
@@ -208,6 +211,7 @@ int main(void)
          default: // ERROR IN STATE MACHINE
            return 1;
         }
+      write(&number_to_display);
       input = GPIOPinRead(GPIO_PORTF_BASE,
                           GPIO_PIN_0 | GPIO_PIN_4);
     }
