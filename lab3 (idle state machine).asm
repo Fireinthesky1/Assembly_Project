@@ -5,7 +5,7 @@
 
 GPIO_UNLOCK_CODE:       .field      0x4C4F434B  ; (pg 684)
 SYSCTRL_RCGCGPIO_R:     .field      0x400FE608  ; (pg 340)
-SYSCTRL_RCC_R           .field      0x400FE060  ; (pg 254)
+SYSCTRL_RCC_R:          .field      0x400FE060  ; (pg 254)
 
 GPIO_PORTB_DIR_R:       .field      0x40005400  ; (pg 663)
 GPIO_PORTB_DR4R_R:      .field      0x40005504  ; (pg 674)
@@ -16,7 +16,7 @@ GPIO_PORTF_CR:          .field      0x40025524  ; (pg 685)
 GPIO_PORTF_PUR_R:       .field      0x40025510  ; (pg 677)
 GPIO_PORTF_DEN_R:       .field      0x4002551C  ; (pg 682)
 
-oDATA_READ_BOTH         .field      0x40025044  ; (pg 662) bit 0,4
+oDATA_READ_BOTH:        .field      0x40025044  ; (pg 662) bit 0,4
 oDATA_WRITE:            .field      0x4000503C  ; (pg 662) bit 0-4
 
 ; FOUR STATES OF STATE MACHINE
@@ -33,7 +33,7 @@ main:
 
     ; ENABLE CLOCK TO PORT B,F (bit 1, 5)
         LDR     R0, SYSCTRL_RCGCGPIO_R
-        LDR     R1, [R1]
+        LDR     R1, [R0]
         ORR     R1, #0x22                       ; (bit 1 and 5 high)
         STR     R1, [R0]
 
