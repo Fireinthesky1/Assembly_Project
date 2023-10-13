@@ -8,7 +8,8 @@
 // to produce a steady display
 // separate display code into its own .c/.h files
 
-// initially, once per second the value of the count will change by 1
+// TODO(JAMES): THIS CODE IS UNFINISHED
+
 #pragma once
 
 #include <stdbool.h>
@@ -26,6 +27,9 @@ uint8_t digit_to_display = 1;
 
 int init(void)
 {
+
+//GPIO======================================================================
+
     // ENABLE CLOCK TO PORT D
     SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOD);
     while(!SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOD))
@@ -80,25 +84,79 @@ int init(void)
                      GPIO_STRENGTH_2MA,
                      GPIO_PIN_TYPE_STD);
 
-    // ENABLE MOST FOR SYSTEM CLOCK
+    // ENABLE MOSC FOR SYSTEM CLOCK
     SysCtlClockSet(SYSCTL_USE_OSC | SYSCTL_OSC_MAIN |
                    SYSCTL_XTAL_16MZ);
 
     // ALLOW THE PROCESSOR TO RESPOND TO INTERRUPTS
     IntMasterEnable();
 
-    // ENABLE THE INTERUPT FOR TIMER1
-    IntEnable(INT_TIMER1A);
-
     // DISABLE PRIORITY MASKING
     IntPriorityMaskSet(0x0);
+
+//TIMER1->Display Timer=====================================================
+
+    // ENABLE THE TIMER1 PERIPHERAL
+    SysCtlPeripheralEnable(STSCTL_PERIPH_TIMER1);
+
+    // WAIT FOR TIMER1 MODULE TO BE READY
+    while(!SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER1))
+    {
+    }
+
+    // SET CLOCK SOURCE FOR TIMER 1
+    TimerClockSourceSet(TIMER1_BASE,
+                        TIMER_CLOCK_SYSTEM);
+
+    // CONFIGURE TIMER1
+    TimerConfigure(TIMER1_BASE,
+                   TIMER_CFG_ONE_SHOT);
+
+    // SET THE COUNT TIME FOR TIMER1 (1 second) <- ASK PROF ABOUT THIS
+    TimerLoadSet(TIMER1_BASE,
+                 TIMER_A,
+                 16000000);
+
+    // CONGIFURE TIMER1 TO COUNT RISING EDGES
+    TimerControlEvents(TIMER1_BASE,
+                       TIMER_A,
+                       TIMER_EVENT_POS_EDGE);
+
+    // ENABLE THE INTERUPT FOR TIMER1
+    TimerIntEnable(TIMER1_BASE,
+                   TIMER_TIMA_TIMEOUT);
 
     // SET THE PRIORITY OF TIMER 1A (HIGHEST PRIORITY)
     IntPrioritySet(INT_TIMER1A, 0x00);
 
     // REGISTER THE INTERRUPT FOR THE DISPLAY
-    IntRegister(INT_TIMER1A, display_interrupt_handler);
+    TimerIntRegister(TIMER1_BASE,
+                     TIMERA,
+                     display_interrupt_handler);
 
+// TIMER2->Increment Timer==================================================
+
+    // ENABLE THE TIMER2 PERIPHERAL
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER2);
+
+    // WAIT FOR TIMER2 MODULE TO BE READY
+    while(!SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER2))
+    {
+    }
+
+    // SET THE CLOCK SOURCE FOR TIMER 2
+    TimerClockSourceSet(TIMER2_BASE,
+                        TIMER_CLOCK_SYSTEM);
+
+    // CONFIGURE TIMER2
+    TimerConfigure(TIMER1_BASE);
+
+    // SET THE COUNT TIME FOR TIMER2
+
+    // CONFIGURE TIMER 2 TO COUNT RISING EDGES
+    TimerControlEvent(TIMER2_BASE,
+                      TIMER_A,
+                      TIMER_EVENT_POS_EDGE);
     return 0;
 }
 

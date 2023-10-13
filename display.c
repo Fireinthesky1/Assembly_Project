@@ -56,5 +56,6 @@ void display_interrupt_handler(void)
     digit_to_display %= 3;
     digit_to_display++;
     // CLEAR THE TRIGGER FLAG
-    
+    TimerIntClear(TIMER1_BASE,
+                  TIMER_TIMA_TIMEOUT);
 }

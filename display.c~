@@ -55,4 +55,6 @@ void display_interrupt_handler(void)
     // INCREMENT CONTROL
     digit_to_display %= 3;
     digit_to_display++;
+    // CLEAR THE TRIGGER FLAG
+    
 }
