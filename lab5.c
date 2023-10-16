@@ -25,6 +25,11 @@ extern void display_interrupt_handler(void);
 uint8_t number_to_display = 0;
 uint8_t digit_to_display = 1;
 
+void increment_interrupt_handler(void)
+{
+  number_to_display++;
+}
+
 int init(void)
 {
 
@@ -127,7 +132,7 @@ int init(void)
                    TIMER_TIMA_TIMEOUT);
 
     // SET THE PRIORITY OF TIMER 1A (HIGHEST PRIORITY)
-    IntPrioritySet(INT_TIMER1A, 0x00);
+    IntPrioritySet(INT_TIMER1, 0x00);
 
     // REGISTER THE INTERRUPT FOR THE DISPLAY
     TimerIntRegister(TIMER1_BASE,
@@ -149,17 +154,39 @@ int init(void)
                         TIMER_CLOCK_SYSTEM);
 
     // CONFIGURE TIMER2
-    TimerConfigure(TIMER1_BASE);
+    TimerConfigure(TIMER2_BASE,
+                   TIMER_CFG_ONE_SHOT);
 
     // SET THE COUNT TIME FOR TIMER2
+    TimerLoadSet(TIMER2_BASE,
+                 TIMER_A,
+                 16000000);
 
     // CONFIGURE TIMER 2 TO COUNT RISING EDGES
     TimerControlEvent(TIMER2_BASE,
                       TIMER_A,
                       TIMER_EVENT_POS_EDGE);
+
+    TimerIntEnable(TIMER2_BASE,
+                   TIMER_TIMA_TIMEOUT);
+
+    IntPrioritySet(INT_TIMER2, 0x00);
+
+    TimerIntRegister(TIMER2_BASE,
+                     TIMER_A,
+                     increment_interrupt_handler);
+
     return 0;
 }
 
 int main()
 {
+  init();
+  TimerEnable(TIMER1_BASE,
+              TIMERA);
+  TimerEnable(TIMER2_BASE,
+              TIMERA);
+  while(1)
+  {
+  }
 }
