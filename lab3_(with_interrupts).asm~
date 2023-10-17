@@ -48,6 +48,8 @@ main:
         AND     R0, #0
         AND     R1, #0
 ; ENABLE COMMIT TO PORTF
+; only for PF0
         LDR     R0, GPIO_PORTF_CR
         LDR     R1, [R0]
-        ORR     
+        ORR     R1, #0x1
+        STR     R1, [R0]
