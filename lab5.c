@@ -15,16 +15,21 @@
 
 // triggering a switch interrupt immediately triggers a systick interrupt
 
+// TODO(James): ASK PROF WHY "this assembly directive potentially unsafe inside a function"
+
 #pragma once
 
 #include <stdbool.h>
 #include <stdint.h>
 #include <inc/hw_memmap.h>
+#include <inc/hw_ints.h>
 #include <driverlib/gpio.h>
 #include <driverlib/sysctl.h>
+#include <driverlib/systick.h>
+#include <driverlib/timer.h>
+#include <driverlib/interrupt.h>
 
 #include "display.h"
-#include "timer.h"
 
 extern void display_interrupt_handler(void);
 
@@ -60,7 +65,7 @@ void debounce(void)
   // if systick finished
   __asm("wait:                              \n"
         "           LDR       R1, [R0]      \n"
-        "           BIC       R1, GRABBIT16 \n"
+        "           BIC       R1, R2        \n"
         "           CMP       R1, #0        \n"
         "           BNE       wait            ");
   // Disable the timer
@@ -81,20 +86,20 @@ void sw1_interrupt_handler(void)
   else
   {
     // enable increment interrupt
-    TimeIntEnable(TIMER1_BASE,
+    TimerIntEnable(TIMER1_BASE,
                   TIMER_TIMA_TIMEOUT);
     incrementing = true;
   }
 
-  GPIOIntClear(PORTF_BASE,
-               GPIO_PIN_4)
+  GPIOIntClear(GPIO_PORTF_BASE,
+               GPIO_PIN_4);
 }
 
 void sw2_interrupt_handler(void)
 {
   debounce();
   number_to_display = 0;
-  GPIOIntClear(PORTF_BASE,
+  GPIOIntClear(GPIO_PORTF_BASE,
                GPIO_PIN_0);
 }
 
@@ -111,10 +116,10 @@ int timer_init(void)
 //TIMER1->Display Timer=====================================================
 
   // ENABLE THE TIMER1 PERIPHERAL
-  SysCtlPeripheralEnable(STSCTL_PERIPH_TIMER1);
+  SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER1);
 
   // WAIT FOR TIMER1 MODULE TO BE READY
-  while(!SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER1))
+  while(!SysCtlPeripheralReady(SYSCTL_PERIPH_TIMER1))
   {
   }
 
@@ -134,7 +139,7 @@ int timer_init(void)
                0xF423FF);
 
   // CONGIFURE TIMER1 TO COUNT RISING EDGES
-  TimerControlEvents(TIMER1_BASE,
+  TimerControlEvent(TIMER1_BASE,
                      TIMER_A,
                      TIMER_EVENT_POS_EDGE);
 
@@ -143,11 +148,11 @@ int timer_init(void)
                  TIMER_TIMA_TIMEOUT);
 
   // SET THE PRIORITY OF TIMER 1A (HIGHEST PRIORITY)
-  IntPrioritySet(INT_TIMER1, 0x00);
+  IntPrioritySet(INT_TIMER1A, 0x00);
 
   // REGISTER THE INTERRUPT FOR THE DISPLAY
   TimerIntRegister(TIMER1_BASE,
-                   TIMERA,
+                   TIMER_A,
                    display_interrupt_handler);
 
 // TIMER2->Increment Timer==================================================
@@ -156,7 +161,7 @@ int timer_init(void)
   SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER2);
 
   // WAIT FOR TIMER2 MODULE TO BE READY
-  while(!SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER2))
+  while(!SysCtlPeripheralReady(SYSCTL_PERIPH_TIMER2))
   {
   }
 
@@ -183,7 +188,7 @@ int timer_init(void)
   TimerIntEnable(TIMER2_BASE,
                  TIMER_TIMA_TIMEOUT);
 
-  IntPrioritySet(INT_TIMER2, 0x00);
+  IntPrioritySet(INT_TIMER2A_TM4C123, 0x00);
 
   TimerIntRegister(TIMER2_BASE,
                    TIMER_A,
@@ -210,7 +215,7 @@ int gpio_init(void)
 
   // ENABLE CLOCK TO PORT F
   SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
-  while(!SysCtlPeripheralReady(STSCTL_PERIPH_GPIOF))
+  while(!SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOF))
   {
   }
 
@@ -255,7 +260,7 @@ int gpio_init(void)
   // ARE WE USING MAIN OSCILLATOR OR EXTERNAL CRYSTAL?
   // WHAT'S THE DIFFERENCE?
   SysCtlClockSet(SYSCTL_USE_OSC | SYSCTL_OSC_MAIN |
-                 SYSCTL_XTAL_16MZ);
+                 SYSCTL_XTAL_16MHZ);
 
   // ALLOW THE PROCESSOR TO RESPOND TO INTERRUPTS
   IntMasterEnable();
@@ -264,7 +269,7 @@ int gpio_init(void)
   IntPriorityMaskSet(0x0);
 
   // ENABLE INTERRUPTS FOR PF0, PF4
-  GPIOIntEnable(PORTF_BASE,
+  GPIOIntEnable(GPIO_PORTF_BASE,
                 GPIO_INT_PIN_0 | GPIO_INT_PIN_4);
 
   // REGISTER INTERRUPT HANDLER FOR PF4 (sw1)
@@ -292,9 +297,9 @@ int main()
 
   // ENABLE TIMERS
   TimerEnable(TIMER1_BASE,
-              TIMERA);
+              TIMER_A);
   TimerEnable(TIMER2_BASE,
-              TIMERA);
+              TIMER_A);
 
   // LOOP FOREVER
   while(1)
