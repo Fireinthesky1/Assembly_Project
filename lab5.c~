@@ -37,7 +37,6 @@ uint8_t number_to_display = 0;
 uint8_t digit_to_display = 1;
 bool incrementing = true;
 
-
 void increment_interrupt_handler(void)
 {
   number_to_display++;

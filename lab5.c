@@ -172,7 +172,7 @@ int timer_init(void)
   // HALF WIDTH
   // PERIODIC
   TimerConfigure(TIMER2_BASE,
-                 TIMER_CFG_A_PERIODIC);
+                 TIMER_CFG_PERIODIC);
 
   // SET THE COUNT TIME FOR TIMER2
   TimerLoadSet(TIMER2_BASE,
@@ -187,7 +187,7 @@ int timer_init(void)
   TimerIntEnable(TIMER2_BASE,
                  TIMER_TIMA_TIMEOUT);
 
-  IntPrioritySet(INT_TIMER2A_TM4C123, 0x00);
+  // IntPrioritySet(INT_TIMER2A_TM4C123, 0x00);
 
   TimerIntRegister(TIMER2_BASE,
                    TIMER_A,
