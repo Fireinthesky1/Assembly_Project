@@ -4,4 +4,4 @@
         ;; and editing the Startup.s file to specify those functions for the
         ;; appropriate interrupt
 
-        ;; We need two timers (in addition to the SysTick timer)
+        ;; We need two timers (in addition to the SysTick 
