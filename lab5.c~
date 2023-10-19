@@ -16,6 +16,8 @@
 // triggering a switch interrupt immediately triggers a systick interrupt
 
 // TODO(James): ASK PROF WHY "this assembly directive potentially unsafe inside a function"
+// TODO(James):
+
 
 #pragma once
 
@@ -102,17 +104,19 @@ void sw2_interrupt_handler(void)
                GPIO_PIN_0);
 }
 
-int timer_init(void)
+// debounce timer
+int systick_init(void)
 {
-
-//SYSTICK->Debounce Timer===================================================
-
   // 16 MHz, we want to debounce for
   // 10 milliseconds
   SysTickDisable();
   SysTickPeriodSet(0x27100);
+  return 0;
+}
 
-//TIMER1->Display Timer=====================================================
+// display timer
+int timer1_init(void)
+{
 
   // ENABLE THE TIMER1 PERIPHERAL
   SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER1);
@@ -154,7 +158,12 @@ int timer_init(void)
                    TIMER_A,
                    display_interrupt_handler);
 
-// TIMER2->Increment Timer==================================================
+  return 0;
+}
+
+// increment timer
+int timer2_init(void)
+{
 
   // ENABLE THE TIMER2 PERIPHERAL
   SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER2);
@@ -172,7 +181,7 @@ int timer_init(void)
   // HALF WIDTH
   // PERIODIC
   TimerConfigure(TIMER2_BASE,
-                 TIMER_CFG_A_PERIODIC);
+                 TIMER_CFG_PERIODIC);
 
   // SET THE COUNT TIME FOR TIMER2
   TimerLoadSet(TIMER2_BASE,
@@ -187,7 +196,7 @@ int timer_init(void)
   TimerIntEnable(TIMER2_BASE,
                  TIMER_TIMA_TIMEOUT);
 
-  IntPrioritySet(INT_TIMER2A_TM4C123, 0x00);
+  // IntPrioritySet(INT_TIMER2A_TM4C123, 0x00);
 
   TimerIntRegister(TIMER2_BASE,
                    TIMER_A,
@@ -254,12 +263,8 @@ int gpio_init(void)
                    GPIO_STRENGTH_2MA,
                    GPIO_PIN_TYPE_STD);
 
-  // ENABLE MOSC FOR SYSTEM CLOCK
-  // ASK PROF ABOUT PAGE 494 data sheet <=========================================
-  // ARE WE USING MAIN OSCILLATOR OR EXTERNAL CRYSTAL?
-  // WHAT'S THE DIFFERENCE?
-  SysCtlClockSet(SYSCTL_USE_OSC | SYSCTL_OSC_MAIN |
-                 SYSCTL_XTAL_16MHZ);
+  // USE THE 16Mhz internal oscillator <===================================================
+  SysCtlClockSet(SYSCTL_USE_OSC | SYSCTL_OSC_INT);
 
   // ALLOW THE PROCESSOR TO RESPOND TO INTERRUPTS
   IntMasterEnable();

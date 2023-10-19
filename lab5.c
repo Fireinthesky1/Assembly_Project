@@ -17,6 +17,7 @@
 
 // TODO(James): ASK PROF WHY "this assembly directive potentially unsafe inside a function"
 
+
 #pragma once
 
 #include <stdbool.h>
@@ -102,18 +103,19 @@ void sw2_interrupt_handler(void)
                GPIO_PIN_0);
 }
 
-int timer_init(void)
+// debounce timer
+int systick_init(void)
 {
-
-//SYSTICK->Debounce Timer===================================================
-
   // 16 MHz, we want to debounce for
   // 10 milliseconds
   SysTickDisable();
   SysTickPeriodSet(0x27100);
+  return 0;
+}
 
-//TIMER1->Display Timer=====================================================
-
+// display timer
+int timer1_init(void)
+{
   // ENABLE THE TIMER1 PERIPHERAL
   SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER1);
 
@@ -124,37 +126,37 @@ int timer_init(void)
 
   // SET CLOCK SOURCE FOR TIMER 1
   TimerClockSourceSet(TIMER1_BASE,
-                      TIMER_CLOCK_SYSTEM);
+                      TIMER_CLOCK_PIOSC);
 
-  // CONFIGURE TIMER1
-  // HALF WIDTH (16 bits)
-  // PERIODIC (repeating)
+  // DISABLE THE TIMER FOR INITIALIZATION
+  TimerDisable(TIMER1_BASE,
+               TIMER_BOTH);
+
+  // full width periodic
   TimerConfigure(TIMER1_BASE,
-                 TIMER_CFG_A_PERIODIC);
+                 TIMER_CFG_PERIODIC);
 
-  // SET THE COUNT TIME FOR TIMER1 (1 second ~ 160,000,000 - 1 cycles)
+  // ONLY TIMER_A (pg 554)
+  // 16 Mhz timer 16,000,000 cycles (1 second)
   TimerLoadSet(TIMER1_BASE,
                TIMER_A,
-               0xF423FF);
-
-  // CONGIFURE TIMER1 TO COUNT RISING EDGES
-  TimerControlEvent(TIMER1_BASE,
-                     TIMER_A,
-                     TIMER_EVENT_POS_EDGE);
+               0xF42400);
 
   // ENABLE THE INTERUPT FOR TIMER1
   TimerIntEnable(TIMER1_BASE,
                  TIMER_TIMA_TIMEOUT);
-
-  // SET THE PRIORITY OF TIMER 1A (HIGHEST PRIORITY)
-  IntPrioritySet(INT_TIMER1A, 0x00);
 
   // REGISTER THE INTERRUPT FOR THE DISPLAY
   TimerIntRegister(TIMER1_BASE,
                    TIMER_A,
                    display_interrupt_handler);
 
-// TIMER2->Increment Timer==================================================
+  return 0;
+}
+
+// increment timer
+int timer2_init(void)
+{
 
   // ENABLE THE TIMER2 PERIPHERAL
   SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER2);
@@ -168,26 +170,21 @@ int timer_init(void)
   TimerClockSourceSet(TIMER2_BASE,
                       TIMER_CLOCK_SYSTEM);
 
-  // CONFIGURE TIMER2
-  // HALF WIDTH
-  // PERIODIC
+  // disable timer for initialization
+  TimerDisable(TIMER2_BASE,
+               TIMER_BOTH);
+
+  // FULL WIDTH PERIODIC
   TimerConfigure(TIMER2_BASE,
                  TIMER_CFG_PERIODIC);
 
   // SET THE COUNT TIME FOR TIMER2
   TimerLoadSet(TIMER2_BASE,
                TIMER_A,
-               0xF423FF);
-
-  // CONFIGURE TIMER 2 TO COUNT RISING EDGES
-  TimerControlEvent(TIMER2_BASE,
-                    TIMER_A,
-                    TIMER_EVENT_POS_EDGE);
+               0xF42400);
 
   TimerIntEnable(TIMER2_BASE,
                  TIMER_TIMA_TIMEOUT);
-
-  // IntPrioritySet(INT_TIMER2A_TM4C123, 0x00);
 
   TimerIntRegister(TIMER2_BASE,
                    TIMER_A,
@@ -254,12 +251,8 @@ int gpio_init(void)
                    GPIO_STRENGTH_2MA,
                    GPIO_PIN_TYPE_STD);
 
-  // ENABLE MOSC FOR SYSTEM CLOCK
-  // ASK PROF ABOUT PAGE 494 data sheet <=========================================
-  // ARE WE USING MAIN OSCILLATOR OR EXTERNAL CRYSTAL?
-  // WHAT'S THE DIFFERENCE?
-  SysCtlClockSet(SYSCTL_USE_OSC | SYSCTL_OSC_MAIN |
-                 SYSCTL_XTAL_16MHZ);
+  // USE THE 16Mhz PIOSC
+  SysCtlClockSet(SYSCTL_USE_OSC | SYSCTL_OSC_INT);
 
   // ALLOW THE PROCESSOR TO RESPOND TO INTERRUPTS
   IntMasterEnable();
@@ -281,7 +274,11 @@ int gpio_init(void)
                      GPIO_PIN_0,
                      sw2_interrupt_handler);
 
-  // ASK PROF IF WE NEED TO CALL GPIOIntTypeSet() here <==========================
+  // THE INTERRUPTS ONLY OCCUR WHEN THE BUTTON
+  // IS PRESSED <==========================================================================
+  GPIOIntTypeSet(GPIO_PORTF_BASE,
+                 GPIO_PIN_0 | GPIO_PIN_4,
+                 GPIO_FALLING_EDGE);
 
   return 0;
 }
@@ -292,13 +289,14 @@ int main()
   gpio_init();
 
   // INITIALIZE TIMER 1 and TIMER 2
-  timer_init();
+  timer1_init();
+  timer2_init();
 
   // ENABLE TIMERS
   TimerEnable(TIMER1_BASE,
-              TIMER_A);
+              TIMER_BOTH);
   TimerEnable(TIMER2_BASE,
-              TIMER_A);
+              TIMER_BOTH);
 
   // LOOP FOREVER
   while(1)
