@@ -2,6 +2,7 @@
 #pragma once
 
 #include "display.h"
+#include <driverlib/timer.h>
 
 uint8_t control_converter(void)
 {
@@ -14,26 +15,22 @@ uint8_t display_converter(void)
 {
 
   uint8_t result = number_to_display;
-  switch(digit_to_disaplay)
+  switch(digit_to_display)
   {
   case 1:
     return result % 10;
-    break;
   case 2:
     result %= 10;
     result /= 10;
     return result % 10;
-    break;
   case 3:
     result %= 10;
     result /= 10;
     result %= 10;
     result /= 10;
     return result % 10;
-    break;
   default:  // VERY BAD IF WE END UP HERE
-    return -1;
-    break;
+    return 0;
   }
 
 }
@@ -46,7 +43,7 @@ void display_interrupt_handler(void)
 
   // WRITE TO PORT E (control)
   GPIOPinWrite(GPIO_PORTE_BASE,
-               GPIO_PIN_1 | GPIO_PIN_2,
+               GPIO_PIN_1 | GPIO_PIN_2 |
                GPIO_PIN_3,
                control);
 

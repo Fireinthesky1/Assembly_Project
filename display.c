@@ -20,14 +20,10 @@ uint8_t display_converter(void)
   case 1:
     return result % 10;
   case 2:
-    result %= 10;
     result /= 10;
     return result % 10;
   case 3:
-    result %= 10;
-    result /= 10;
-    result %= 10;
-    result /= 10;
+    result /= 100;
     return result % 10;
   default:  // VERY BAD IF WE END UP HERE
     return 0;
