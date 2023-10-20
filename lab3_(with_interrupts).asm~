@@ -83,8 +83,6 @@ main:
         ORR     R1, 0x0F
         STR     R1, [R0]
 
-
-
 ;;; INTERRUPTS
 ;;; WE WANT TO SET AN INTERRUPT FOR PF0 and PF4
         ;; DEVICE ARM
@@ -93,3 +91,6 @@ main:
         ;; LEVEL
         ;; TRIGGER
 
+;;; INITIALIZATION
+        ;; 1) Set bit 0 in PRIMASK high
+        ;; 2)

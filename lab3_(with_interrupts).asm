@@ -83,6 +83,13 @@ main:
         ORR     R1, 0x0F
         STR     R1, [R0]
 
+;;; INTERRUPT STUFF BELOW
+
+GPIOF_IM_R:             .field          0x40025410 ; page 667 ds
+GPIOF_IEV_R:            .field          0x4002540C ; page 666 ds (DEVIL)
+NVIC_EN0_R:             .field          0xE000E100 ; page 142 ds
+
+
 ;;; INTERRUPTS
 ;;; WE WANT TO SET AN INTERRUPT FOR PF0 and PF4
         ;; DEVICE ARM
@@ -91,6 +98,31 @@ main:
         ;; LEVEL
         ;; TRIGGER
 
-;;; INITIALIZATION
-        ;; 1) Set bit 0 in PRIMASK high
-        ;; 2)
+;;; DEVICE ARM
+;;; ARM PORTF PF4 (sw1) and PF0 (sw2)
+        LDR     R0, GPIO_IM_R
+        LDR     R1, [R0]
+        ORR     R1, #0x11        ; bit 0 and bit 4
+        STR     R1, [R0]
+
+;;; SET NEGATIVE EDGE TRIGGER FOR SW1 SW2
+        LDR     R0, GPIO_IEV_R
+        LDR     R1, [R0]
+        BIC     R1, #0x11       ; clear bits 0 and 4
+        STR     R1, [R0]
+
+;;; NVIC ENABLE (portf) (dancing with devil)
+        LDR     R0, GPIO_EN0_R
+        LDR     R1, [R0]
+        ORR     R1, 0x40000000  ; set bit 30
+        STR     R1, [R0]
+
+;;; GLOBAL ENABLE (PRIMASK bit 0)
+        MRS     R0, PRIMASK
+        ORR     R0, #0x1
+        MSR     PRIMASK, R0
+
+;;; LEVEL (write 0 to unmask all exceptions pg 87 ds)
+        MRS     R0, BASEPRI
+        MOVB    R0, #0x00
+        MSR     BASEPRI, R0
