@@ -159,7 +159,7 @@ int timer2_init(void)
 
   // SET THE CLOCK SOURCE FOR TIMER 2
   TimerClockSourceSet(TIMER2_BASE,
-                      TIMER_CLOCK_SYSTEM);
+                      TIMER_CLOCK_PIOSC);
 
   // disable timer for initialization
   TimerDisable(TIMER2_BASE,

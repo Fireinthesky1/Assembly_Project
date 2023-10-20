@@ -1,22 +1,8 @@
 // James Hicks Lab 5, October 5 2023
 
-// use a general purpose timer with an interrupt to make
-// the count change every second
-
-// At startup the count wil be increasing by 1 each second
-
+// Displays and incrementing count
 // Pressing sw1 will pause the count
 // pressing sw2 will reset the count to zero
-
-// Use SysTick with an interrupt to handle all switch debouncing needs
-
-// Debounce has highest priority
-// all others have lower and equal priority
-
-// triggering a switch interrupt immediately triggers a systick interrupt
-
-// TODO(James): ASK PROF WHY "this assembly directive potentially unsafe inside a function"
-
 
 #pragma once
 
@@ -49,42 +35,15 @@ void increment_interrupt_handler(void)
                 TIMER_TIMA_TIMEOUT);
 }
 
-// when we get on the gpio interrupt
-// disable gpio interrupts
-// clear gpio interrupts
-// and start a timer
-// in the timer interrupt we enable gpio interrupt and disable the timer interrupt
-
-void debounce(void)
+void systick_interrupt_handler(void)
 {
+  // DISABLE SYSTICK INTERRUPTS
+  SysTickIntDisable();
 
-  // load R0 with 0xE000E010 (STCTRL)
-  // load R2 with FFFEFFFF
-  // This is so we can use R2 to clear all
-  // but 16th bit (count flag) and compare that with 0
-
-  uint32_t time;
-
-  // START THE COUNTER
-  SysTickEnable();
-
-  time = SysTickValueGet();
-
-  while(time > 1000)
-  {
-      time = SysTickValueGet();
-  }
-
+  // DISABLE THE TIMER
   SysTickDisable();
 
-}
-
-void portf_interrupt_handler(void)
-{
-  debounce();
-  GPIOIntClear(GPIO_PORTF_BASE,
-               GPIO_PIN_4 | GPIO_PIN_0);
-
+  // DEAL WITH STATES
   uint32_t current_state = GPIOPinRead(GPIO_PORTF_BASE,
                                        GPIO_PIN_0 | GPIO_PIN_4);
 
@@ -104,9 +63,34 @@ void portf_interrupt_handler(void)
     number_to_display = 0;
   }
 
+  // ENABLE GPIO INTERRUPT
+  GPIOIntEnable(GPIO_PORTF_BASE,
+                GPIO_PIN_0 | GPIO_PIN_4);
+}
+
+void portf_interrupt_handler(void)
+{
+  // DISABLE GPIO INTERRUPTS
+  GPIOIntDisable(GPIO_PORTF_BASE,
+                 GPIO_PIN_0 | GPIO_PIN_4);
+
+  // CLEAR GPIO INTERRUPTS
   GPIOIntClear(GPIO_PORTF_BASE,
                GPIO_PIN_4 | GPIO_PIN_0);
 
+  // ENABLE SYSTICK INTERRUPTS
+  SysTickIntEnable();
+
+  // ENSURE THE SYSTICK COUNTER IS RELOADED
+  // REGISTER IS WRITE CLEAR
+  __asm("NVIC_ST_CURRENT_R:    .field    0xE000E018  \n"
+        "        AND           R10, #0               \n"
+        "        LDR           R10, NVIC_ST_CURRENT_R\n"
+        "        LDR           R11, [R10]            \n"
+        "        STR           R11, [R10]            \n");
+
+  // START SYSTICK
+  SysTickEnable();
 }
 
 
@@ -116,7 +100,7 @@ int systick_init(void)
   // 16 MHz, we want to debounce for
   // 10 milliseconds
   SysTickDisable();
-  SysTickPeriodSet(0x274E8);
+  SysTickPeriodSet(0x27100);
   return 0;
 }
 
@@ -267,12 +251,6 @@ int gpio_init(void)
   // DISABLE PRIORITY MASKING
   IntPriorityMaskSet(0x0);
 
-  //INTERRUPTS ONLY OCCUR WHEN THE BUTTON
-  // IS PRESSED //<==========================================================================
-  //GPIOIntTypeSet(GPIO_PORTF_BASE,
-  //               GPIO_PIN_0 | GPIO_PIN_4,
-  //               GPIO_FALLING_EDGE);
-
   // ENABLE INTERRUPTS FOR PF0, PF4
   GPIOIntEnable(GPIO_PORTF_BASE,
                 GPIO_INT_PIN_0 | GPIO_INT_PIN_4);
@@ -287,7 +265,6 @@ int main()
 {
   // INITIALIZE GPIO
   gpio_init();
-
 
   // INITIALIZE SYSTICK
   systick_init();
