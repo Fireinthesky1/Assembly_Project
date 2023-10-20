@@ -40,11 +40,20 @@ bool incrementing = true;
 
 void increment_interrupt_handler(void)
 {
-  number_to_display++;
+  if(incrementing)
+  {
+      number_to_display++;
+  }
   // CLEAR THE TRIGGER FLAG
   TimerIntClear(TIMER2_BASE,
                 TIMER_TIMA_TIMEOUT);
 }
+
+// when we get on the gpio interrupt
+// disable gpio interrupts
+// clear gpio interrupts
+// and start a timer
+// in the timer interrupt we enable gpio interrupt and disable the timer interrupt
 
 void debounce(void)
 {
@@ -53,55 +62,53 @@ void debounce(void)
   // load R2 with FFFEFFFF
   // This is so we can use R2 to clear all
   // but 16th bit (count flag) and compare that with 0
-  __asm("STCTRL:    .field    0xE000E010    \n"
-        "GRABBIT16  .field    0xFFFEFFFF    \n"
-        "           LDR       R0, STCTRL    \n"
-        "           LDR       R2, GRABBIT16   ");
+
+  uint32_t time;
 
   // START THE COUNTER
   SysTickEnable();
 
-  // constantly check the count flag to see
-  // if systick finished
-  __asm("wait:                              \n"
-        "           LDR       R1, [R0]      \n"
-        "           BIC       R1, R2        \n"
-        "           CMP       R1, #0        \n"
-        "           BNE       wait            ");
-  // Disable the timer
+  time = SysTickValueGet();
+
+  while(time > 1000)
+  {
+      time = SysTickValueGet();
+  }
+
   SysTickDisable();
 
 }
 
-void sw1_interrupt_handler(void)
+void portf_interrupt_handler(void)
 {
   debounce();
-  if(incrementing)
+  GPIOIntClear(GPIO_PORTF_BASE,
+               GPIO_PIN_4 | GPIO_PIN_0);
+
+  uint32_t current_state = GPIOPinRead(GPIO_PORTF_BASE,
+                                       GPIO_PIN_0 | GPIO_PIN_4);
+
+  if(current_state == 0x10)//sw2
   {
-    // disable increment interrupt
-    TimerIntDisable(TIMER1_BASE,
-                    TIMER_TIMA_TIMEOUT);
-    incrementing = false;
+    if(incrementing)
+    {
+      incrementing = false;
+    }
+    else
+    {
+      incrementing = true;
+    }
   }
-  else
+  else if (current_state == 0x01)//sw1
   {
-    // enable increment interrupt
-    TimerIntEnable(TIMER1_BASE,
-                  TIMER_TIMA_TIMEOUT);
-    incrementing = true;
+    number_to_display = 0;
   }
 
   GPIOIntClear(GPIO_PORTF_BASE,
-               GPIO_PIN_4);
+               GPIO_PIN_4 | GPIO_PIN_0);
+
 }
 
-void sw2_interrupt_handler(void)
-{
-  debounce();
-  number_to_display = 0;
-  GPIOIntClear(GPIO_PORTF_BASE,
-               GPIO_PIN_0);
-}
 
 // debounce timer
 int systick_init(void)
@@ -109,7 +116,7 @@ int systick_init(void)
   // 16 MHz, we want to debounce for
   // 10 milliseconds
   SysTickDisable();
-  SysTickPeriodSet(0x27100);
+  SysTickPeriodSet(0x274E8);
   return 0;
 }
 
@@ -140,7 +147,7 @@ int timer1_init(void)
   // 16 Mhz timer 16,000,000 cycles (1 second)
   TimerLoadSet(TIMER1_BASE,
                TIMER_A,
-               0xF42400);
+               0x15B38);
 
   // ENABLE THE INTERUPT FOR TIMER1
   TimerIntEnable(TIMER1_BASE,
@@ -260,25 +267,18 @@ int gpio_init(void)
   // DISABLE PRIORITY MASKING
   IntPriorityMaskSet(0x0);
 
+  //INTERRUPTS ONLY OCCUR WHEN THE BUTTON
+  // IS PRESSED //<==========================================================================
+  //GPIOIntTypeSet(GPIO_PORTF_BASE,
+  //               GPIO_PIN_0 | GPIO_PIN_4,
+  //               GPIO_FALLING_EDGE);
+
   // ENABLE INTERRUPTS FOR PF0, PF4
   GPIOIntEnable(GPIO_PORTF_BASE,
                 GPIO_INT_PIN_0 | GPIO_INT_PIN_4);
 
-  // REGISTER INTERRUPT HANDLER FOR PF4 (sw1)
-  GPIOIntRegisterPin(GPIO_PORTF_BASE,
-                     GPIO_PIN_4,
-                     sw1_interrupt_handler);
-
-  // REGISTER INTERRUPT HANDLER FOR PF0 (sw2)
-  GPIOIntRegisterPin(GPIO_PORTF_BASE,
-                     GPIO_PIN_0,
-                     sw2_interrupt_handler);
-
-  // THE INTERRUPTS ONLY OCCUR WHEN THE BUTTON
-  // IS PRESSED <==========================================================================
-  GPIOIntTypeSet(GPIO_PORTF_BASE,
-                 GPIO_PIN_0 | GPIO_PIN_4,
-                 GPIO_FALLING_EDGE);
+  GPIOIntRegister(GPIO_PORTF_BASE,
+                  portf_interrupt_handler);
 
   return 0;
 }
@@ -287,6 +287,10 @@ int main()
 {
   // INITIALIZE GPIO
   gpio_init();
+
+
+  // INITIALIZE SYSTICK
+  systick_init();
 
   // INITIALIZE TIMER 1 and TIMER 2
   timer1_init();
