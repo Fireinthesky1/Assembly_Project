@@ -28,28 +28,68 @@ BOTH_PRESSED:           .equ            0x00000000
 
 main:
         .asmfunc
-; CLEAR REGISTERS
+
+        ;; GPIO INIT
+                                ; CLEAR REGISTERS
         AND     R0, #0
         AND     R1, #0
         AND     R2, #0
-; ENABLE CLOCK TO PORT B,F (bit 1 5)
+
+                                ; ENABLE CLOCK TO PORT B,F (bit 1 5)
         LDR     R0, SYSCTRL_RCGCGPIO
         LDR     R1, [R0]
         ORR     R1, 0x022
         STR     R1, [R0]
-; CLEAR REGISTERS
-        AND     R0, #0
-        AND     R1, #0
-; UNLOCK GPIO PORT F
+
+                                ; UNLOCK GPIO PORT F
         LDR     R0, GPIO_PORTF_LOCK_R
         LDR     R1, GPIO_UNLOCK_CODE
         STR     R1, [R0]
-; CLEAR REGISTERS
-        AND     R0, #0
-        AND     R1, #
+
                                 ; ENABLE COMMIT TO PORTF
                                 ; only for PF0
         LDR     R0, GPIO_PORTF_CR
         LDR     R1, [R0]
         ORR     R1, #0x1
         STR     R1, [R0]
+
+                                ; ENABLE PUR FOR PF0 and PF4
+        LDR     R0, GPIO_PORTF_PUR_R
+        LDR     R1, [R0]
+        ORR     R1, 0x11        ; bit 0, bit 4 high
+        STR     R1, [R0]
+
+                                ; SET 4 mA drive for PB0-3
+        LDR     R0, GPIO_PORTB_DR4D_4
+        LDR     R1, [R0]
+        ORR     R1, 0x0F        ; bit 0-3 high
+        STR     R1, [R0]
+
+                                ;  SET DEN FOR PB0-3
+        LDR     R0, GPIO_PORTB_DEN_R
+        LDR     R1, [R0]
+        ORR     R1, 0x0F
+        STR     R1, [R0]
+
+                                ; SET DEN FOR PF0, PF4
+        LDR     R0, GPIO_PORTF_DEN_R
+        LDR     R1, [R0]
+        ORR     R1, 0x11
+        STR     R1, [R0]
+
+                                ; SET DIR for PB0-3
+        LDR     R0, GPIO_PORTB_DIR_R
+        LDR     R1, [R0]
+        ORR     R1, 0x0F
+        STR     R1, [R0]
+
+
+
+;;; INTERRUPTS
+;;; WE WANT TO SET AN INTERRUPT FOR PF0 and PF4
+        ;; DEVICE ARM
+        ;; NVIC ENABLE
+        ;; GLOBAL ENABLE
+        ;; LEVEL
+        ;; TRIGGER
+
