@@ -2,8 +2,9 @@
 // PROBLEM 2
 // James Hicks
 
-#include <stdbool.h>
+#include <math.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <inc/hw_memmap.h>
 #include <inc/hw_ints.h>
 #include <driverlib/gpio.h>
@@ -12,18 +13,28 @@
 #include <driverlib/interrupt.h>
 
 const uint8_t LED_RED            = 0x02; // one
-const uint8_t LED_RED_BLUE       = 0x06; // two
+const uint8_t LED_PURPLE         = 0x06; // two
 const uint8_t LED_BLUE           = 0x04; // three
 const uint8_t LED_GREEN          = 0x08; // four
-const uint8_t LED_RED_GREEN_BLUE = 0x0E; // five
+const uint8_t LED_WHITE          = 0x0E; // five
 
 uint8_t current_state = 0x11;
-uint8_t current_color = 0x02;
+int     current_color = 0;
 
-uint8_t none = 0x00000011;
-uint8_t one  = 0x00000001;
-uint8_t two  = 0x00000010;
-uint8_t both = 0x00000000;
+const uint8_t none = 0x11;
+const uint8_t one  = 0x01;
+const uint8_t two  = 0x10;
+const uint8_t both = 0x00;
+
+int fuck_c_gimme_back_my_mod_operator(int a, int b)
+{
+   int intermediate = a % b;
+   if(intermediate < 0)
+   {
+      return 5 + intermediate; // <- EVIL VUDU MAGIC
+   }
+   return intermediate; // HOW?
+}
 
 // 1) disable timer interrupts
 // 2) clear timer interrupt flag
@@ -47,132 +58,68 @@ void timer1_interrupt_handler(void)
    uint8_t input = GPIOPinRead(GPIO_PORTF_BASE,
                                GPIO_PIN_0 | GPIO_PIN_4);
 
-   // STATE TRANSITIONS
-   switch(current_color)
+   switch(current_state)
    {
-
-      case LED_RED:
-         if(input == 0x01)             // sw 1 (back)
+      case 0x11:
+         if(input == two)
          {
-           current_color = LED_RED_GREEN_BLUE;
+            current_color++;
          }
-         else if(input == 0x10)        // sw2 (forward)
+         else if(input == one)
          {
-            current_color = LED_RED_BLUE;
-         }
-         else if(input == 0x00)
-         {
-            if(current_state == 0x01) // sw 2 (forward)
-            {
-               current_color = LED_RED_BLUE;
-            }
-            else if(input == 0x10)    // sw1 (backward)
-            {
-               current_color = LED_RED_GREEN_BLUE;
-            }
+            current_color--;
          }
          break;
-
-      case LED_RED_BLUE:
-         if(input == 0x01)             // sw 1 (back)
+      case 0x10:
+         if(input == 0x00)
          {
-            current_color = LED_RED;
-         }
-         else if(input == 0x10)        // sw2 (forward)
-         {
-            current_color = LED_BLUE;
-         }
-         else if(input == 0x00)
-         {
-            if(current_state == 0x01) // sw 2 (forward)
-            {
-               current_color = LED_BLUE;
-            }
-            else if(input == 0x10)    // sw1 (backward)
-            {
-               current_color = LED_RED;
-            }
+            current_color--;
          }
          break;
-
-      case LED_BLUE:
-         if(input == 0x01)             // sw 1 (back)
+      case 0x01:
+         if(input == 0x00)
          {
-            current_color = LED_RED_BLUE;
-         }
-         else if(input == 0x10)        // sw2 (forward)
-         {
-            current_color = LED_GREEN;
-         }
-         else if(input == 0x00)
-         {
-            if(current_state == 0x01) // sw 2 (forward)
-            {
-               current_color = LED_GREEN;
-            }
-            else if(input == 0x10)    // sw1 (backward)
-            {
-               current_color = LED_RED_BLUE;
-            }
+            current_color++;
          }
          break;
-
-      case LED_GREEN:
-         if(input == 0x01)             // sw 1 (back)
-         {
-            current_color = LED_BLUE;
-         }
-         else if(input == 0x10)        // sw2 (forward)
-         {
-            current_color = LED_RED_GREEN_BLUE;
-         }
-         else if(input == 0x00)
-         {
-            if(current_state == 0x01) // sw 2 (forward)
-            {
-               current_color = LED_RED_GREEN_BLUE;
-            }
-            else if(input == 0x10)    // sw1 (backward)
-            {
-               current_color = LED_BLUE;
-            }
-         }
-         break;
-
-      case LED_RED_GREEN_BLUE:
-         if(input == 0x01)             // sw 1 (back)
-         {
-            current_color = LED_GREEN;
-         }
-         else if(input == 0x10)        // sw2 (forward)
-         {
-            current_color = LED_RED;
-         }
-         else if(input == 0x00)
-         {
-            if(current_state == 0x01) // sw 2 (forward)
-            {
-               current_color = LED_RED;
-            }
-            else if(input == 0x10)    // sw1 (backward)
-            {
-               current_color = LED_GREEN;
-            }
-         }
-
-         break;
-
-      default:                           // bad if we get here
+      default:
          break;
    }
 
+   current_color = fuck_c_gimme_back_my_mod_operator(current_color, 5);
+
+   uint8_t display;
+
+   switch(current_color)
+   {
+      case 0:
+         display = LED_RED;
+         break;
+      case 1:
+         display = LED_PURPLE;
+         break;
+      case 2:
+         display = LED_BLUE;
+         break;
+      case 3:
+         display = LED_GREEN;
+         break;
+      case 4:
+         display = LED_WHITE;
+         break;
+      default:
+         display = 0x00;
+         break;
+   }
+
+   // FIND NEXT STATE
    current_state = input;
 
-   // WRITE THE CURRENT STATE
+   // WRITE
    GPIOPinWrite(GPIO_PORTF_BASE,
                 GPIO_PIN_1 | GPIO_PIN_2 |
                 GPIO_PIN_3,
-                current_color);
+                display);
 
    // ENABLE GPIO INTERRUPTS
    GPIOIntEnable(GPIO_PORTF_BASE,
@@ -259,7 +206,7 @@ void gpio_init(void)
    // ONLY TRIGGER ON FALLING EDGE
    GPIOIntTypeSet(GPIO_PORTF_BASE,
                   GPIO_PIN_0 | GPIO_PIN_4,
-                  GPIO_FALLING_EDGE);
+                  GPIO_BOTH_EDGES);
 
    // ENABLE INTERRUPTS FOR PF0 and PF4
    GPIOIntEnable(GPIO_PORTF_BASE,
@@ -311,7 +258,7 @@ void timer1_init(void)
 }
 
 
-int main(void)
+void main(void)
 {
 
    // INITIALIZE GPIO
@@ -324,12 +271,10 @@ int main(void)
    GPIOPinWrite(GPIO_PORTF_BASE,
                 GPIO_PIN_1 | GPIO_PIN_2 |
                 GPIO_PIN_3,
-                current_color);
+                LED_RED);
 
    while(1)
    {
    }
-
-   return 0;
 
 }

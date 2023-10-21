@@ -32,13 +32,17 @@ uint8_t both = 0x00000000;
 void timer1_interrupt_handler(void)
 {
 
+   // CLEAR THE TIMER INT FLAG
+   TimerIntClear(TIMER1_BASE,
+                 TIMER_TIMA_TIMEOUT);
+
    // DISABLE TIMER INTERRUPTS
    TimerIntDisable(TIMER1_BASE,
                    TIMER_BOTH);
 
-   // CLEAR THE TIMER INT FLAG
-   TimerIntClear(TIMER1_BASE,
-                 TIMER_TIMA_TIMEOUT);
+   // DISABLE THE TIMER
+   TimerDisable(TIMER1_BASE,
+                TIMER_BOTH);
 
    uint8_t input = GPIOPinRead(GPIO_PORTF_BASE,
                                GPIO_PIN_0 | GPIO_PIN_4);
@@ -50,11 +54,22 @@ void timer1_interrupt_handler(void)
       case LED_RED:
          if(input == 0x01)             // sw 1 (back)
          {
-            current_color = LED_RED_GREEN_BLUE;
+           current_color = LED_RED_GREEN_BLUE;
          }
          else if(input == 0x10)        // sw2 (forward)
          {
             current_color = LED_RED_BLUE;
+         }
+         else if(input == 0x00)
+         {
+            if(current_state == 0x01) // sw 2 (forward)
+            {
+               current_color = LED_RED_BLUE;
+            }
+            else if(input == 0x10)    // sw1 (backward)
+            {
+               current_color = LED_RED_GREEN_BLUE;
+            }
          }
          break;
 
@@ -67,6 +82,17 @@ void timer1_interrupt_handler(void)
          {
             current_color = LED_BLUE;
          }
+         else if(input == 0x00)
+         {
+            if(current_state == 0x01) // sw 2 (forward)
+            {
+               current_color = LED_BLUE;
+            }
+            else if(input == 0x10)    // sw1 (backward)
+            {
+               current_color = LED_RED;
+            }
+         }
          break;
 
       case LED_BLUE:
@@ -77,6 +103,17 @@ void timer1_interrupt_handler(void)
          else if(input == 0x10)        // sw2 (forward)
          {
             current_color = LED_GREEN;
+         }
+         else if(input == 0x00)
+         {
+            if(current_state == 0x01) // sw 2 (forward)
+            {
+               current_color = LED_GREEN;
+            }
+            else if(input == 0x10)    // sw1 (backward)
+            {
+               current_color = LED_RED_BLUE;
+            }
          }
          break;
 
@@ -89,6 +126,17 @@ void timer1_interrupt_handler(void)
          {
             current_color = LED_RED_GREEN_BLUE;
          }
+         else if(input == 0x00)
+         {
+            if(current_state == 0x01) // sw 2 (forward)
+            {
+               current_color = LED_RED_GREEN_BLUE;
+            }
+            else if(input == 0x10)    // sw1 (backward)
+            {
+               current_color = LED_BLUE;
+            }
+         }
          break;
 
       case LED_RED_GREEN_BLUE:
@@ -100,6 +148,18 @@ void timer1_interrupt_handler(void)
          {
             current_color = LED_RED;
          }
+         else if(input == 0x00)
+         {
+            if(current_state == 0x01) // sw 2 (forward)
+            {
+               current_color = LED_RED;
+            }
+            else if(input == 0x10)    // sw1 (backward)
+            {
+               current_color = LED_GREEN;
+            }
+         }
+
          break;
 
       default:                           // bad if we get here
@@ -127,22 +187,26 @@ void timer1_interrupt_handler(void)
 void portf_interrupt_handler(void)
 {
 
-   // DISABLE GPIO INTERRUPTS
-   GPIOIntDisable(GPIO_PORTF_BASE,
-                  GPIO_PIN_0 | GPIO_PIN_4);
-
    // CLEAR GPIO INTERRUPTS
    GPIOIntClear(GPIO_PORTF_BASE,
                 GPIO_PIN_0 | GPIO_PIN_4);
 
-   // ENABLE TIMER1 INTERRUPTS
-   TimerIntEnable(TIMER1_BASE,
-                  TIMER_TIMA_TIMEOUT);
+   // DISABLE GPIO INTERRUPTS
+   GPIOIntDisable(GPIO_PORTF_BASE,
+                  GPIO_PIN_0 | GPIO_PIN_4);
+
+   // DISABLE THE TIMER
+   TimerDisable(TIMER1_BASE,
+                TIMER_BOTH);
 
    // LOAD THE TIMER (.010 seconds)
    TimerLoadSet(TIMER1_BASE,
                 TIMER_A,
-                0x4E200); // 27100 = .01 sec
+                0x27100); // 27100 = .01 sec
+
+   // ENABLE TIMER1 INTERRUPTS
+   TimerIntEnable(TIMER1_BASE,
+                  TIMER_TIMA_TIMEOUT);
 
    // START TIMER1
    TimerEnable(TIMER1_BASE,
