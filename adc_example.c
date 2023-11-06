@@ -25,6 +25,7 @@ void configure(void)
     ADCSequenceConfigure(ADC0_BASE, 3, ADC_TRIGGER_PROCESSOR,0);
     ADCSequenceStepConfigure(ADC0_BASE, 3, 0, ADC_CTL_IE | ADC_CTL_END | ADC_CTL_CH0); 
     ADCSequenceEnable(ADC0_BASE, 3);
+    
     ADCProcessorTrigger(ADC0_BASE, 3);
     ADCIntRegister(ADC0_BASE, 3, ADCInt);
     ADCIntEnable(ADC0_BASE,3);
