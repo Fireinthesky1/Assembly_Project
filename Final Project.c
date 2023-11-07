@@ -9,6 +9,7 @@
 #include <driverlib/gpio.h>
 #include <driverlib/sysctl.h>
 #include <driverlib/timer.h>
+#include <driverlib/adc.h>
 
 #define mph            0
 #define kmph           1
@@ -26,11 +27,14 @@ uint8_t current_display_mode = 0;
 // 0 = neither, 1 = acc, 2 = brk
 uint8_t current_acc_brk_mode = 0;
 
-uint32_t speed_off_adc;
-uint32_t set_off_adc;
+volatile uint32_t speed_off_adc;
+volatile uint32_t set_off_adc;
 
-uint8_t number_to_display;
-uint8_t digit_to_display;
+uint32_t current_speed;
+uint32_t current_set;
+
+volatile uint8_t number_to_display;
+volatile uint8_t digit_to_display;
 
 ///////////////////////////////////////////////////////////////////////////
 // Constantly monitor sensor and set point control for changes
@@ -118,7 +122,7 @@ void debounce_interrupt_handler(void)
 
     // LOAD THE "5 SEC" TIMER (full width)
     // 80,000,000 cycles / (16,000,000 cycles per sec = 5 sec
-    TimerLoadSet(TIMER2_BASE, TIMERA, 0x4C4B400)
+    TimerLoadSet(TIMER2_BASE, TIMER_A, 0x4C4B400);
 
     // START THE "5 SEC" timer
     TimerEnable(TIMER2_BASE, TIMER_BOTH);
@@ -149,6 +153,8 @@ void adc0_interrupt_handler(void)                                          // co
     // GET THE NUMBER OFF OF ADC0
     ADCSequenceDataGet(ADC0_BASE, 3, &speed_off_adc);
 
+    ADCProcessorTrigger(ADC0_BASE, 3);
+
     // REENABLE ADC0 INTERRUPTS
     ADCIntEnable(ADC0_BASE, 3);
 }
@@ -163,7 +169,9 @@ void adc1_interrupt_handler(void)
     ADCIntClear(ADC1_BASE, 3);
 
     // GET THE NUMBER OFF OF ADC1
-    ADCSequenceDataGet(AD1_BASE, 3, &set_off_adc);
+    ADCSequenceDataGet(ADC1_BASE, 3, &set_off_adc);
+
+    ADCProcessorTrigger(ADC1_BASE, 3);
 
     // REENABLE ADC1 INTERRUPTS
     ADCIntEnable(ADC1_BASE, 3);
@@ -174,10 +182,11 @@ void adc1_interrupt_handler(void)
 
 /* PORT B Pin: 5        <- ADC current speed
    PORT E Pin: 5        <- ADC set point */
-int adc_init(void)
+void adc_init(void)
 {
     // Port B Pin 5 (ADC0) current speed
     SysCtlPeripheralEnable(SYSCTL_PERIPH_ADC0);
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_ADC1);
 
     while(!SysCtlPeripheralReady(SYSCTL_PERIPH_ADC0))
     {
@@ -185,9 +194,7 @@ int adc_init(void)
 
     GPIOPinTypeADC(GPIO_PORTB_BASE, GPIO_PIN_5);
 
-    ADCClockConfigSet(ADC0_BASE,
-                      ADC_CLOCK_SRC_PIOSC | ADC_CLOCK_RATE_FULL,
-                      1);
+    ADCClockConfigSet(ADC0_BASE, ADC_CLOCK_SRC_PIOSC | ADC_CLOCK_RATE_FULL,1);
 
     ADCHardwareOversampleConfigure(ADC0_BASE, 64); // <- be careful here
 
@@ -197,13 +204,12 @@ int adc_init(void)
           "; SET DITHER BIT FOR 0 BASE                     \n"
           "             LDR         R10, ADCCTL_0          \n"
           "             LDR         R11, [R10]             \n"
-          "             ORR         R11, 0x40     ; bit 6  \n"
+          "             ORR         R11, #0x40     ; bit 6 \n"
           "             STR         R11, [R10]             \n"
           );
 
     // UNDERSTAND THIS
-    ADCSequenceStepConfigure(ADC0_BASE, 3, 0,
-                             ADC_CTL_IE | ADC_CTL_END | ADC_CTL_CH0);
+    ADCSequenceStepConfigure(ADC0_BASE, 3, 0, ADC_CTL_IE | ADC_CTL_END | ADC_CTL_CH0);
 
     ADCSequenceEnable(ADC0_BASE, 3);
 
@@ -228,7 +234,7 @@ int adc_init(void)
           "; SET DITHER BIT FOR 1 BASE                     \n"
           "             LDR         R10, ADCCTL_1          \n"
           "             LDR         R11, [R10]             \n"
-          "             ORR         R11, 0x40     ; bit 6  \n"
+          "             ORR         R11, #0x40     ; bit 6 \n"
           "             STR         R11, [R10]             \n"
          );
 
@@ -257,7 +263,7 @@ PORT F Pin: 1,2,3    <- acc/brk indicator (RBG)
 
 PORT F Pin: 4        <- display mode selector (sw 1)
 */
-int gpio_init(void)
+void gpio_init(void)
 {
 //ENABLE CLOCK (D,E,B,F)///////////////////////////////////////////////////
 
@@ -275,7 +281,7 @@ int gpio_init(void)
 
     // ENABLE CLOCK TO PORT B
     SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOB);
-    while(!SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOF))
+    while(!SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOB))
     {
     }
 
@@ -335,14 +341,14 @@ int gpio_init(void)
     GPIOPadConfigSet(GPIO_PORTF_BASE,
                      GPIO_PIN_1 | GPIO_PIN_2 |
                      GPIO_PIN_3,
-                     GPIO_STRENGTH_2MA, 
+                     GPIO_STRENGTH_2MA,
                      GPIO_PIN_TYPE_STD);
 
     // CONFIGURE DISPLAY MODE SELECTOR PORT F
     GPIOPadConfigSet(GPIO_PORTF_BASE,
                      GPIO_PIN_4,
-                     GPIO_STRENGTH_2MA, 
-                     GPIO_PIN_TYPE_WPU);
+                     GPIO_STRENGTH_2MA,
+                     GPIO_PIN_TYPE_STD_WPU);
 
 //MISC INITIALIZATION//////////////////////////////////////////////////////
 
@@ -375,7 +381,7 @@ int timer0_init(void)
     while(!SysCtlPeripheralReady(SYSCTL_PERIPH_TIMER0))
     {
     }
-    
+
     // SET CLOCK SOURCE FOR TIMER 1
     TimerClockSourceSet(TIMER0_BASE,
                         TIMER_CLOCK_PIOSC);
@@ -432,7 +438,7 @@ int timer1_init(void)
     // 60 fps per display
     TimerLoadSet(TIMER1_BASE,
                  TIMER_A,
-                 0x15B38);
+                 0x15B38); //0x15B38
 
     // ENABLE THE INTERUPT FOR TIMER1
     TimerIntEnable(TIMER1_BASE,
@@ -472,7 +478,7 @@ int timer2_init(void)
     TimerConfigure(TIMER2_BASE, TIMER_CFG_PERIODIC);
 
     // 5 seconds
-    TimerLoadSet(TIMER2_BASE, TIMERA, 0x4C4B400);
+    TimerLoadSet(TIMER2_BASE, TIMER_A, 0x4C4B400);
 
     // ENABLE THE INTERUPT FOR TIMER1
     TimerIntEnable(TIMER2_BASE,
@@ -502,42 +508,41 @@ int main(void)
     // START TIMERS
     TimerEnable(TIMER1_BASE, TIMER_BOTH);
 
+    // INITIAL PROCESSOR TRIGGER
+    ADCProcessorTrigger(ADC0_BASE, 3);
+    ADCProcessorTrigger(ADC1_BASE, 3);
+
     // LOOP FOREVER
 
     while(1)
     {
-        // COLLECT ADC DATA
-        ADCProcessorTrigger(ADC0_BASE, 3);
-        ADCProcessorTrigger(ADC1_BASE, 3);
-
         // DISPLAY MODE STATE
+        current_speed =  100 * speed_off_adc / digital_max;
+        current_set = 60 * set_off_adc / digital_max + 20;
         switch (current_display_mode)
         {
             case mph:
-                GPIODataWrite(GPIO_PORTB_BASE, GPIO_PIN_0, 0x00);
-                number_to_display = (speed_off_adc / digital_max) * 100;   // make sure this works
+                GPIOPinWrite(GPIO_PORTB_BASE, GPIO_PIN_0, 0x00);
+                number_to_display = current_speed;   // make sure this works
                 break;
             case kmph:
-                GPIODataWrite(GPIO_PORTB_BASE, GPIO_PIN_0, 0x00);
-                number_to_display =
-                             (speed_off_adc / digital_max) * 100 * 1.6093; // make sure this works
+                GPIOPinWrite(GPIO_PORTB_BASE, GPIO_PIN_0, 0x00);
+                number_to_display = current_speed * 1.6093; // make sure this works
                 break;
             case set:
-                GPIODataWrite(GPIO_PORTB_BASE, GPIO_PIN_0, 0x01);
-                number_to_display = (set_off_adc / digital_max) * 60 + 20; // make sure this works
+                GPIOPinWrite(GPIO_PORTB_BASE, GPIO_PIN_0, 0x01);
+                number_to_display = current_set; // make sure this works
                 break;
-            default: 
+            default:
                 return -1;
                 break; // <- VERY BAD IF WE END UP HERE
         }
 
         // UPDATE ACC/BRK STATE
-        current_speed = (speed_off_adc / 4095) * 100;
-        current_set = (set_off_adc / 4095) * 60 + 20;
         switch(current_acc_brk_mode)
         {
             case neither: // BLUE
-                GPIODataWrite(GPIO_PORTF_BASE,
+                GPIOPinWrite(GPIO_PORTF_BASE,
                               GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3,
                               0x04);
                 if(current_speed - current_set >= 3)
@@ -548,7 +553,7 @@ int main(void)
                     current_acc_brk_mode = neither;
                 break;
             case acc: // GREEN
-                GPIODataWrite(GPIO_PORTF_BASE,
+                GPIOPinWrite(GPIO_PORTF_BASE,
                               GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3,
                               0x08);
                 if(current_speed - current_set >= 3)
@@ -559,7 +564,7 @@ int main(void)
                     current_acc_brk_mode = neither;
                 break;
             case brk: // RED
-                GPIODataWrite(GPIO_PORTF_BASE,
+                GPIOPinWrite(GPIO_PORTF_BASE,
                               GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3,
                               0x02);
                 if(current_speed - current_set >= 3)
