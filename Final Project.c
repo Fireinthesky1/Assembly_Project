@@ -27,59 +27,17 @@ uint8_t current_display_mode = 0;
 // 0 = neither, 1 = acc, 2 = brk
 uint8_t current_acc_brk_mode = 0;
 
-volatile uint32_t speed_off_adc;
-volatile uint32_t set_off_adc;
+volatile uint32_t speed_off_adc = 0;
+volatile uint32_t set_off_adc = 0;
 
-uint32_t current_speed;
-uint32_t current_set;
+uint32_t current_speed = 0;
+uint32_t current_set = 0;
 
-volatile uint8_t number_to_display;
-volatile uint8_t digit_to_display;
-
-///////////////////////////////////////////////////////////////////////////
-// Constantly monitor sensor and set point control for changes
-
-// SEVEN SEGMENT DISPLAY //
-    // SHOWS THE INTEGER PORTION OF WHATEVER VALUE IS TO BE DISPLAYED BY
-    // THE CURRENTLY SELECTED MODE
-
-    // MPH MODE WILL SHOW THE CURRENT SPEED IN MPH AND THE DISPLAY MODE
-    // INDICATOR WILL BE OFF
-
-    // KMPH MODE WILL SHOW THE CURRENT SPEED IN KILOMETERS PER HOUR AND THE
-    // DISPLAY MODE INDICATOR WILL BE OFF
-
-    // SET POINT MODE WILL SHOW THE SET POINT IN MPH AND THE DISPLAY MODE
-    // INDICATOR WILL BE ON
-
-    // AT STARTUP THE DISPLAY MODE WIL BE MPH
-    // PRESSING SWITCH 1
-        // MPH  -> KMPH
-        // KMPH -> SET
-        // SET  -> MPH
-
-    // IF THE DISPLAY MODE IS ANYTHING OTHER THAN MPH AND IT HAS BEEN 5 SEC
-    // SINCE THE LAST TIME THE MODE SELECTOR WAS PRESSED THE DISPLAY WILL
-    // AUTOMATICALLY CHANGE BACK TO MPH MODE
-
-// BRAKING / ACCELERATING MODE INDICATOR //
-    // IF THE BRAKES ARE OFF AND THE SPEED INCREASES MORE THAN 3MPH ABOVE
-    // THE SET POINT THE BRAKES WILL TURN ON
-
-    // IF THE BREAKES ARE ON THE SPEED DECREASES TO MEET THE SET POINT
-    // THE BRAKES THEN TURN OFF
-
-    // IF ACCELERATION IS OFF AND THE SPEED DECREASED MORE THAN 3 MPG BELOW
-    // THE SET POINT ACCELERATION WILL TURN ON
-
-    // IF ACCELERATION IS ON AND THE SPEED INCREASES TO MEET OR EXCEED THE
-    // SET POINT THE ACCLERATOR WILL TURN OFF
-
-    // ANY TIME NEITHER THE BRAKES NOR ACCELERATION IS ON THE MODE INDICATOR
-    // MUST POSITIVELY INDICATE THIS
-///////////////////////////////////////////////////////////////////////////
+volatile uint8_t number_to_display = 0;
+volatile uint8_t digit_to_display = 0;
 
 ///////////////////////////////////////////////////////////////////////////
+
 //INTERRUPT SERVICE ROUTINES
 
 void switch_interrupt_handler(void)
@@ -126,9 +84,13 @@ void debounce_interrupt_handler(void)
 
     // START THE "5 SEC" timer
     TimerEnable(TIMER2_BASE, TIMER_BOTH);
+
+    // REENABLE GPIO INTERRUPTS
+    GPIOIntEnable(GPIO_PORTF_BASE,
+                  GPIO_PIN_ 4);
 }
 
-// display mode timer
+// FIVE SECOND TIMER (TO RESET DISPLAY MODE AT TIMEOUT)
 void timer_2_interrupt_handler(void)
 {
     // DISABLE TIMER2 INTERRUPTS
@@ -142,7 +104,7 @@ void timer_2_interrupt_handler(void)
 }
 
 // SPEED ADC
-void adc0_interrupt_handler(void)                                          // come back
+void adc0_interrupt_handler(void)
 {
     // DISABLE ADC0 INTERRUPTS
     ADCIntDisable(ADC0_BASE, 3);
@@ -153,13 +115,14 @@ void adc0_interrupt_handler(void)                                          // co
     // GET THE NUMBER OFF OF ADC0
     ADCSequenceDataGet(ADC0_BASE, 3, &speed_off_adc);
 
+    // START THE NEXT SEQUENCE
     ADCProcessorTrigger(ADC0_BASE, 3);
 
     // REENABLE ADC0 INTERRUPTS
     ADCIntEnable(ADC0_BASE, 3);
 }
 
-// SET ADC                                                                 // come back
+// SET ADC
 void adc1_interrupt_handler(void)
 {
     // DISABLE ADC1 INTERRUPTS
@@ -186,7 +149,6 @@ void adc_init(void)
 {
     // Port B Pin 5 (ADC0) current speed
     SysCtlPeripheralEnable(SYSCTL_PERIPH_ADC0);
-    SysCtlPeripheralEnable(SYSCTL_PERIPH_ADC1);
 
     while(!SysCtlPeripheralReady(SYSCTL_PERIPH_ADC0))
     {
@@ -194,22 +156,28 @@ void adc_init(void)
 
     GPIOPinTypeADC(GPIO_PORTB_BASE, GPIO_PIN_5);
 
-    ADCClockConfigSet(ADC0_BASE, ADC_CLOCK_SRC_PIOSC | ADC_CLOCK_RATE_FULL,1);
+    ADCClockConfigSet(ADC0_BASE,
+                      ADC_CLOCK_SRC_PIOSC |
+                      ADC_CLOCK_RATE_FULL,
+                      1);
 
-    ADCHardwareOversampleConfigure(ADC0_BASE, 64); // <- be careful here
+    ADCHardwareOversampleConfigure(ADC0_BASE, 64);
 
     ADCSequenceConfigure(ADC0_BASE, 3, ADC_TRIGGER_PROCESSOR, 0);
     __asm("ADCCTL_0:      .field      0x40038038  ; pg 850 \n"
           "ADCSAC_0:      .field      0x40038030  ; pg 847 \n"
           "; SET DITHER BIT FOR 0 BASE                     \n"
+          "             AND         R10, #0                \n"
+          "             AND         R11, #0                \n"
           "             LDR         R10, ADCCTL_0          \n"
           "             LDR         R11, [R10]             \n"
           "             ORR         R11, #0x40     ; bit 6 \n"
           "             STR         R11, [R10]             \n"
           );
 
-    // UNDERSTAND THIS
-    ADCSequenceStepConfigure(ADC0_BASE, 3, 0, ADC_CTL_IE | ADC_CTL_END | ADC_CTL_CH0);
+    ADCSequenceStepConfigure(ADC0_BASE, 3, 0, ADC_CTL_IE  |
+                                              ADC_CTL_END |
+                                              ADC_CTL_CH0);
 
     ADCSequenceEnable(ADC0_BASE, 3);
 
@@ -232,6 +200,8 @@ void adc_init(void)
     __asm("ADCCTL_1:      .field      0x40039038  ; pg 850 \n"
           "ADCSAC_1:      .field      0x40039030  ; pg 847 \n"
           "; SET DITHER BIT FOR 1 BASE                     \n"
+          "             AND         R10, #0                \n"
+          "             AND         R11, #0                \n"
           "             LDR         R10, ADCCTL_1          \n"
           "             LDR         R11, [R10]             \n"
           "             ORR         R11, #0x40     ; bit 6 \n"
@@ -367,12 +337,10 @@ void gpio_init(void)
 
     GPIOIntRegister(GPIO_PORTF_BASE,
                     switch_interrupt_handler);
-
-    return 0;
 }
 
 // DEBOUNCE TIMER
-int timer0_init(void)
+void timer0_init(void)
 {
     // ENABLE THE TIMER1 PERIPHERAL
     SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);
@@ -407,12 +375,10 @@ int timer0_init(void)
     TimerIntRegister(TIMER0_BASE,
                      TIMER_A,
                      debounce_interrupt_handler);
-
-  return 0;
 }
 
 // DISPLAY TIMER
-int timer1_init(void)
+void timer1_init(void)
 {
 
     // ENABLE THE TIMER1 PERIPHERAL
@@ -448,8 +414,6 @@ int timer1_init(void)
     TimerIntRegister(TIMER1_BASE,
                      TIMER_A,
                      display_interrupt_handler);
-
-    return 0;
 }
 
 /*
