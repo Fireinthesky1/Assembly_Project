@@ -19,22 +19,24 @@
 #define brk            2
 #define digital_max 4095
 
-extern void display_interrupt_handler(void);
+extern void       display_interrupt_handler(void);
 
 // 0 = mph, 1 = kmph, 2 = set
-uint8_t current_display_mode = 0;
+uint8_t           current_display_mode = 0;
 
 // 0 = neither, 1 = acc, 2 = brk
-uint8_t current_acc_brk_mode = 0;
+uint8_t           current_acc_brk_mode = 0;
 
 volatile uint32_t speed_off_adc = 0;
 volatile uint32_t set_off_adc = 0;
+bool              speed_adc_ready = false;
+bool              set_adc_ready    = false;
 
-uint32_t current_speed = 0;
-uint32_t current_set = 0;
+uint32_t          current_speed = 0;
+uint32_t          current_set = 0;
 
-volatile uint8_t number_to_display = 0;
-volatile uint8_t digit_to_display = 0;
+volatile uint8_t  number_to_display = 0;
+volatile uint8_t  digit_to_display = 0;
 
 ///////////////////////////////////////////////////////////////////////////
 
@@ -115,6 +117,8 @@ void adc0_interrupt_handler(void)
     // GET THE NUMBER OFF OF ADC0
     ADCSequenceDataGet(ADC0_BASE, 3, &speed_off_adc);
 
+    speed_adc_ready = true;
+
     // START THE NEXT SEQUENCE
     ADCProcessorTrigger(ADC0_BASE, 3);
 
@@ -133,6 +137,8 @@ void adc1_interrupt_handler(void)
 
     // GET THE NUMBER OFF OF ADC1
     ADCSequenceDataGet(ADC1_BASE, 3, &set_off_adc);
+
+    set_adc_ready = true;
 
     ADCProcessorTrigger(ADC1_BASE, 3);
 
@@ -476,30 +482,41 @@ int main(void)
     ADCProcessorTrigger(ADC0_BASE, 3);
     ADCProcessorTrigger(ADC1_BASE, 3);
 
-    // LOOP FOREVER
-
     while(1)
     {
-        // DISPLAY MODE STATE
-        current_speed =  100 * speed_off_adc / digital_max;
-        current_set = 60 * set_off_adc / digital_max + 20;
+
+        // Never update current speed until new value is ready
+        if(speed_adc_ready)
+        {
+            current_speed =  100 * speed_off_adc / digital_max;
+            speed_adc_ready = false;
+        }
+
+        // Never update current set until new value is ready
+        if(set_adc_ready)
+        {
+            current_set = 60 * set_off_adc / digital_max + 20;
+            speed_adc_ready = false;
+        }
+
         switch (current_display_mode)
         {
             case mph:
                 GPIOPinWrite(GPIO_PORTB_BASE, GPIO_PIN_0, 0x00);
-                number_to_display = current_speed;   // make sure this works
+                number_to_display = current_speed;                         // make sure this works
                 break;
             case kmph:
                 GPIOPinWrite(GPIO_PORTB_BASE, GPIO_PIN_0, 0x00);
-                number_to_display = current_speed * 1.6093; // make sure this works
+                number_to_display = current_speed * 1.6093;                // make sure this works
                 break;
             case set:
                 GPIOPinWrite(GPIO_PORTB_BASE, GPIO_PIN_0, 0x01);
-                number_to_display = current_set; // make sure this works
+                number_to_display = current_set;                           // make sure this works
                 break;
             default:
+                printf("ERROR::MAIN::CURRENT_DISPLAY_MODE_SWITCH");
                 return -1;
-                break; // <- VERY BAD IF WE END UP HERE
+                break;
         }
 
         // UPDATE ACC/BRK STATE
@@ -537,6 +554,10 @@ int main(void)
                     current_acc_brk_mode = acc;
                 else
                     current_acc_brk_mode = neither;
+                break;
+            default:
+                printf("ERROR::MAIN::CURRENT_ACC_BRK_MODE_SWITCH");
+                return -1;
                 break;
         }
     }
