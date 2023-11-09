@@ -11,6 +11,7 @@
 
 extern volatile uint8_t number_to_display;
 extern volatile uint8_t digit_to_display;
+extern volatile bool display_ready;
 
 uint8_t control_converter(void);
 uint8_t display_converter(void);

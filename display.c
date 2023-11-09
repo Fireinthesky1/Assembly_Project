@@ -6,6 +6,7 @@
 
 volatile uint8_t number_to_display=0;
 volatile uint8_t digit_to_display=0;
+volatile bool display_ready;
 
 uint8_t control_converter(void)
 {
@@ -21,6 +22,7 @@ uint8_t display_converter(void)
   switch(digit_to_display)
   {
   case 1:
+    display_ready = true;
     return result % 10;
   case 2:
     result /= 10;
