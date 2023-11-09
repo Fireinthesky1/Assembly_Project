@@ -7,6 +7,7 @@
 #include "display.h"
 #include <inc/hw_memmap.h>
 #include <inc/hw_ints.h>
+#include <inc/hw_adc.h>
 #include <driverlib/gpio.h>
 #include <driverlib/sysctl.h>
 #include <driverlib/timer.h>
@@ -35,6 +36,9 @@ bool              set_adc_ready   = false;
 
 int32_t           current_speed = 0;
 int32_t           current_set = 0;
+
+bool              breaks         = false;                                  // TEST CODE DELETE IF NECCESSARY
+bool              acceleration   = false;                                  // TEST CODE DELETE IF NECCESSARY
 
 ///////////////////////////////////////////////////////////////////////////
 
@@ -179,6 +183,10 @@ void adc_init(void)
     ADCHardwareOversampleConfigure(ADC0_BASE, 64);
 
     ADCSequenceConfigure(ADC0_BASE, 3, ADC_TRIGGER_PROCESSOR, 0);
+                                                                           // FIX INLINE ASSEMBLY WITH VALVANO C
+                                                                           // ADC_0_CTL
+                                                                           // ADC0_BASE, ADC1_BASE
+
     __asm("ADCCTL_0:      .field      0x40038038  ; pg 850 \n"
           "; SET DITHER BIT FOR 0 BASE                     \n"
           "             LDR         R10, ADCCTL_0          \n"
@@ -467,6 +475,39 @@ int timer2_init(void)
     return 0;
 }
 
+int get_next_acc_brk_state(void)
+{
+    int difference = current_speed - current_set;
+    switch(current_acc_brk_mode)
+    {
+        case neither:
+            if(!breaks && difference > 3)
+            {
+                return brk;
+            }
+            if(!acceleration && difference < -3)
+            {
+                return acc;
+            }
+            break;
+        case acc:
+            if(difference >= 0)
+            {
+                return neither;
+            }
+            break;
+        case brk:
+            if(difference <= 0)
+            {
+                return neither;
+            }
+            break;
+        default:
+            return current_acc_brk_mode;
+    }
+}
+
+
 int main(void)
 {
 
@@ -524,44 +565,71 @@ int main(void)
                 return -1;
         }
 
-        // UPDATE ACC/BRK STATE
-        switch(current_acc_brk_mode)
-        {
-            case neither: // BLUE
-                GPIOPinWrite(GPIO_PORTF_BASE,
-                              GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3,
-                              0x04);
-                if(current_speed - current_set >= 3)
-                    current_acc_brk_mode = brk;
-                else if(current_speed - current_set <= -3)
-                    current_acc_brk_mode = acc;
-                else
-                    current_acc_brk_mode = neither;
-                break;
-            case acc: // GREEN
-                GPIOPinWrite(GPIO_PORTF_BASE,
-                             GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3,
-                             0x08);
-                if(current_speed - current_set >= 3)
-                    current_acc_brk_mode = brk;
-                else if(current_speed - current_set <= -3)
-                    current_acc_brk_mode = acc;
-                else
-                    current_acc_brk_mode = neither;
-                break;
-            case brk: // RED
-                GPIOPinWrite(GPIO_PORTF_BASE,
-                             GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3,
-                             0x02);
-                if(current_speed - current_set >= 3)
-                    current_acc_brk_mode = brk;
-                else if(current_speed - current_set <= -3)
-                    current_acc_brk_mode = acc;
-                else
-                    current_acc_brk_mode = neither;
-                break;
-            default:
-                return -1;
+//        // UPDATE ACC/BRK STATE
+//        switch(current_acc_brk_mode)
+//        {
+//            case neither: // BLUE
+//                GPIOPinWrite(GPIO_PORTF_BASE,
+//                              GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3,
+//                              0x04);
+//                if(current_speed - current_set >= 3)
+//                    current_acc_brk_mode = brk;
+//                else if(current_speed - current_set <= -3)
+//                    current_acc_brk_mode = acc;
+//                else
+//                    current_acc_brk_mode = neither;
+//                break;
+//            case acc: // GREEN
+//                GPIOPinWrite(GPIO_PORTF_BASE,
+//                             GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3,
+//                             0x08);
+//                if(current_speed - current_set >= 3)
+//                    current_acc_brk_mode = brk;
+//                else if(current_speed - current_set <= -3)
+//                    current_acc_brk_mode = acc;
+//                else
+//                    current_acc_brk_mode = neither;
+//                break;
+//            case brk: // RED
+//                GPIOPinWrite(GPIO_PORTF_BASE,
+//                             GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3,
+//                             0x02);
+//                if(current_speed - current_set >= 3)
+//                    current_acc_brk_mode = brk;
+//                else if(current_speed - current_set <= -3)
+//                    current_acc_brk_mode = acc;
+//                else
+//                    current_acc_brk_mode = neither;
+//                break;
+//            default:
+//                return -1;
+//        }
+
+        current_acc_brk_mode = get_next_acc_brk_state;                     // TEST CODE DELETE IF NECCESSARY
+                                                                           // TEST CODE DELETE IF NECCESSARY
+        switch(current_acc_brk_mode)                                       // TEST CODE DELETE IF NECCESSARY
+        {                                                                  // TEST CODE DELETE IF NECCESSARY
+            case neither: // BLUE                                          // TEST CODE DELETE IF NECCESSARY
+                GPIOPinWrite(GPIO_PORTF_BASE,                              // TEST CODE DELETE IF NECCESSARY
+                            GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3,          // TEST CODE DELETE IF NECCESSARY
+                            0x04);                                         // TEST CODE DELETE IF NECCESSARY
+                break;                                                     // TEST CODE DELETE IF NECCESSARY
+            case acc: // GREEN                                             // TEST CODE DELETE IF NECCESSARY
+                GPIOPinWrite(GPIO_PORTF_BASE,                              // TEST CODE DELETE IF NECCESSARY
+                            GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3,          // TEST CODE DELETE IF NECCESSARY
+                            0x08);                                         // TEST CODE DELETE IF NECCESSARY
+                break;                                                     // TEST CODE DELETE IF NECCESSARY
+            case brk: // RED                                               // TEST CODE DELETE IF NECCESSARY
+                GPIOPinWrite(GPIO_PORTF_BASE,                              // TEST CODE DELETE IF NECCESSARY
+                            GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3,          // TEST CODE DELETE IF NECCESSARY
+                            0x02);                                         // TEST CODE DELETE IF NECCESSARY
+                break;                                                     // TEST CODE DELETE IF NECCESSARY
+            default:                                                       // TEST CODE DELETE IF NECCESSARY
+                return -1;                                                 // TEST CODE DELETE IF NECCESSARY
         }
+
+
+
+
     }
 }
