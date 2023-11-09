@@ -4,6 +4,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "display.h"
 #include <inc/hw_memmap.h>
 #include <inc/hw_ints.h>
 #include <driverlib/gpio.h>
@@ -30,13 +31,10 @@ uint8_t           current_acc_brk_mode = 0;
 volatile uint32_t speed_off_adc = 0;
 volatile uint32_t set_off_adc = 0;
 bool              speed_adc_ready = false;
-bool              set_adc_ready    = false;
+bool              set_adc_ready   = false;
 
-uint32_t          current_speed = 0;
-uint32_t          current_set = 0;
-
-volatile uint8_t  number_to_display = 0;
-volatile uint8_t  digit_to_display = 0;
+int32_t           current_speed = 0;
+int32_t           current_set = 0;
 
 ///////////////////////////////////////////////////////////////////////////
 
@@ -63,19 +61,24 @@ void switch_interrupt_handler(void)
     TimerEnable(TIMER0_BASE, TIMER_BOTH);
 }
 
-// debounce timer
+// debounce timer0
 // debounce starts timer 2 (the 5 sec timer)
 void debounce_interrupt_handler(void)
 {
     // DISABLE TIMER0 INTERRUPTS
     TimerIntDisable(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
 
+    TimerDisable(TIMER0_BASE, TIMER_BOTH);
+
     // CLEAR TIMER0 INTERRUPTS
     TimerIntClear(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
 
     // HANDLE STATE TRANSITIONS
-    current_display_mode++;
-    current_display_mode %= 3;
+    if(GPIOPinRead(GPIO_PORTF_BASE, GPIO_PIN_4) == 0)
+    {
+        current_display_mode++;
+        current_display_mode %= 3;
+    }
 
     // DISABLE THE "5 SEC" TIMER
     TimerDisable(TIMER2_BASE, TIMER_BOTH);
@@ -84,12 +87,15 @@ void debounce_interrupt_handler(void)
     // 80,000,000 cycles / (16,000,000 cycles per sec = 5 sec
     TimerLoadSet(TIMER2_BASE, TIMER_A, 0x4C4B400);
 
+    // REENABLE "5 SEC" timer interrupts
+    TimerIntEnable(TIMER2_BASE, TIMER_TIMA_TIMEOUT);
+
     // START THE "5 SEC" timer
     TimerEnable(TIMER2_BASE, TIMER_BOTH);
 
     // REENABLE GPIO INTERRUPTS
     GPIOIntEnable(GPIO_PORTF_BASE,
-                  GPIO_PIN_ 4);
+                  GPIO_PIN_4);
 }
 
 // FIVE SECOND TIMER (TO RESET DISPLAY MODE AT TIMEOUT)
@@ -97,6 +103,9 @@ void timer_2_interrupt_handler(void)
 {
     // DISABLE TIMER2 INTERRUPTS
     TimerIntDisable(TIMER2_BASE, TIMER_TIMA_TIMEOUT);
+
+    // DISABLE TIMER2
+    TimerDisable(TIMER2_BASE, TIMER_BOTH);
 
     // CLEAR TIMER2 INTERRUPTS
     TimerIntClear(TIMER2_BASE, TIMER_TIMA_TIMEOUT);
@@ -171,10 +180,7 @@ void adc_init(void)
 
     ADCSequenceConfigure(ADC0_BASE, 3, ADC_TRIGGER_PROCESSOR, 0);
     __asm("ADCCTL_0:      .field      0x40038038  ; pg 850 \n"
-          "ADCSAC_0:      .field      0x40038030  ; pg 847 \n"
           "; SET DITHER BIT FOR 0 BASE                     \n"
-          "             AND         R10, #0                \n"
-          "             AND         R11, #0                \n"
           "             LDR         R10, ADCCTL_0          \n"
           "             LDR         R11, [R10]             \n"
           "             ORR         R11, #0x40     ; bit 6 \n"
@@ -183,7 +189,7 @@ void adc_init(void)
 
     ADCSequenceStepConfigure(ADC0_BASE, 3, 0, ADC_CTL_IE  |
                                               ADC_CTL_END |
-                                              ADC_CTL_CH0);
+                                              ADC_CTL_CH11);
 
     ADCSequenceEnable(ADC0_BASE, 3);
 
@@ -204,10 +210,7 @@ void adc_init(void)
     ADCHardwareOversampleConfigure(ADC1_BASE, 64);
 
     __asm("ADCCTL_1:      .field      0x40039038  ; pg 850 \n"
-          "ADCSAC_1:      .field      0x40039030  ; pg 847 \n"
           "; SET DITHER BIT FOR 1 BASE                     \n"
-          "             AND         R10, #0                \n"
-          "             AND         R11, #0                \n"
           "             LDR         R10, ADCCTL_1          \n"
           "             LDR         R11, [R10]             \n"
           "             ORR         R11, #0x40     ; bit 6 \n"
@@ -215,7 +218,7 @@ void adc_init(void)
          );
 
     ADCSequenceStepConfigure(ADC1_BASE, 3, 0,
-                             ADC_CTL_IE | ADC_CTL_END | ADC_CTL_CH1);
+                             ADC_CTL_IE | ADC_CTL_END | ADC_CTL_CH8);
 
     ADCSequenceEnable(ADC1_BASE, 3);
 
@@ -331,11 +334,13 @@ void gpio_init(void)
     // USE THE 16 MHz PIOSC
     SysCtlClockSet(SYSCTL_USE_OSC | SYSCTL_OSC_INT);
 
-    // ALLOW THE PROCESSOR TO RESPOND TO INTERRUPTS
-    IntMasterEnable();
+    //// ALLOW THE PROCESSOR TO RESPOND TO INTERRUPTS
+    // IntMasterEnable();
 
     // DISABLE PRIORITY MASKING
-    IntPriorityMaskSet(0x0);
+    //IntPriorityMaskSet(0x0);
+
+    GPIOIntTypeSet(GPIO_PORTF_BASE, GPIO_PIN_4, GPIO_FALLING_EDGE);
 
     // ENABLE INTERRUPTS FOR PF4
     GPIOIntEnable(GPIO_PORTF_BASE,
@@ -447,7 +452,7 @@ int timer2_init(void)
     // FULL WIDTH PERIODIC
     TimerConfigure(TIMER2_BASE, TIMER_CFG_PERIODIC);
 
-    // 5 seconds
+    // 5 seconds (16000000*5)
     TimerLoadSet(TIMER2_BASE, TIMER_A, 0x4C4B400);
 
     // ENABLE THE INTERUPT FOR TIMER1
@@ -464,6 +469,7 @@ int timer2_init(void)
 
 int main(void)
 {
+
     // INITIALIZE GPIO
     gpio_init();
 
@@ -488,6 +494,7 @@ int main(void)
         // Never update current speed until new value is ready
         if(speed_adc_ready)
         {
+
             current_speed =  100 * speed_off_adc / digital_max;
             speed_adc_ready = false;
         }
@@ -503,20 +510,18 @@ int main(void)
         {
             case mph:
                 GPIOPinWrite(GPIO_PORTB_BASE, GPIO_PIN_0, 0x00);
-                number_to_display = current_speed;                         // make sure this works
+                number_to_display = current_speed;
                 break;
             case kmph:
                 GPIOPinWrite(GPIO_PORTB_BASE, GPIO_PIN_0, 0x00);
-                number_to_display = current_speed * 1.6093;                // make sure this works
+                number_to_display = current_speed * 1.6093;
                 break;
             case set:
                 GPIOPinWrite(GPIO_PORTB_BASE, GPIO_PIN_0, 0x01);
-                number_to_display = current_set;                           // make sure this works
+                number_to_display = current_set;
                 break;
             default:
-                printf("ERROR::MAIN::CURRENT_DISPLAY_MODE_SWITCH");
                 return -1;
-                break;
         }
 
         // UPDATE ACC/BRK STATE
@@ -535,8 +540,8 @@ int main(void)
                 break;
             case acc: // GREEN
                 GPIOPinWrite(GPIO_PORTF_BASE,
-                              GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3,
-                              0x08);
+                             GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3,
+                             0x08);
                 if(current_speed - current_set >= 3)
                     current_acc_brk_mode = brk;
                 else if(current_speed - current_set <= -3)
@@ -546,8 +551,8 @@ int main(void)
                 break;
             case brk: // RED
                 GPIOPinWrite(GPIO_PORTF_BASE,
-                              GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3,
-                              0x02);
+                             GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3,
+                             0x02);
                 if(current_speed - current_set >= 3)
                     current_acc_brk_mode = brk;
                 else if(current_speed - current_set <= -3)
@@ -556,11 +561,7 @@ int main(void)
                     current_acc_brk_mode = neither;
                 break;
             default:
-                printf("ERROR::MAIN::CURRENT_ACC_BRK_MODE_SWITCH");
                 return -1;
-                break;
         }
     }
-
-    return 0;
 }

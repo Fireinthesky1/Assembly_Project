@@ -4,6 +4,9 @@
 #include "display.h"
 #include <driverlib/timer.h>
 
+volatile uint8_t number_to_display=0;
+volatile uint8_t digit_to_display=0;
+
 uint8_t control_converter(void)
 {
   double base = 2;
@@ -33,6 +36,18 @@ uint8_t display_converter(void)
 
 void display_interrupt_handler(void)
 {
+  if(number_to_display <= 99 && digit_to_display == 3)
+  {
+      digit_to_display %= 3;
+      digit_to_display++;
+  }
+  else if(number_to_display <= 9 && digit_to_display == 2)
+  {
+      digit_to_display %= 3;
+      digit_to_display += 2;
+      digit_to_display %= 3;
+  }
+
 
   // GET THE CORRECT CONTROL VALUE
   uint8_t control = control_converter();
