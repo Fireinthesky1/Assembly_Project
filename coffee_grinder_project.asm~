@@ -1,0 +1,12 @@
+; James Hicks Coffee Grinder Project
+
+        .thumb
+        .global main
+
+main:
+        .asmfunc
+
+        AND     R0, #0
+        AND     R1, #0
+
+    ; ENABLE CLOCK TO PORT B

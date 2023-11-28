@@ -182,9 +182,6 @@ void adc_init(void)
     ADCHardwareOversampleConfigure(ADC0_BASE, 64);
 
     ADCSequenceConfigure(ADC0_BASE, 3, ADC_TRIGGER_PROCESSOR, 0);
-                                                                           // FIX INLINE ASSEMBLY WITH VALVANO C
-                                                                           // ADC_0_CTL
-                                                                           // ADC0_BASE, ADC1_BASE
 
     __asm("ADCCTL_0:      .field      0x40038038  ; pg 850 \n"
           "; SET DITHER BIT FOR 0 BASE                     \n"

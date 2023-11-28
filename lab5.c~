@@ -70,24 +70,23 @@ void systick_interrupt_handler(void)
 
 void portf_interrupt_handler(void)
 {
-  // DISABLE GPIO INTERRUPTS
-  GPIOIntDisable(GPIO_PORTF_BASE,
-                 GPIO_PIN_0 | GPIO_PIN_4);
 
   // CLEAR GPIO INTERRUPTS
   GPIOIntClear(GPIO_PORTF_BASE,
                GPIO_PIN_4 | GPIO_PIN_0);
 
+  // DISABLE GPIO INTERRUPTS
+  GPIOIntDisable(GPIO_PORTF_BASE,
+                 GPIO_PIN_0 | GPIO_PIN_4);
+
+  // DISABLE THE TIMER
+  SysTickDisable();
+
+  // LOAD THE TIMER
+  SysTickPeriodSet(0x27100);
+
   // ENABLE SYSTICK INTERRUPTS
   SysTickIntEnable();
-
-  // ENSURE THE SYSTICK COUNTER IS RELOADED
-  // REGISTER IS WRITE CLEAR
-  __asm("NVIC_ST_CURRENT_R:    .field    0xE000E018  \n"
-        "        AND           R10, #0               \n"
-        "        LDR           R10, NVIC_ST_CURRENT_R\n"
-        "        LDR           R11, [R10]            \n"
-        "        STR           R11, [R10]            \n");
 
   // START SYSTICK
   SysTickEnable();
@@ -101,6 +100,7 @@ int systick_init(void)
   // 10 milliseconds
   SysTickDisable();
   SysTickPeriodSet(0x27100);
+  SysTickIntRegister(systick_interrupt_handler);
   return 0;
 }
 
