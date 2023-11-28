@@ -1,12 +1,32 @@
 // James Hicks Lab 5, November 25 2023
 
+/*
+ FOUND THIS IN /inc/GPIO.c
+
+ \note A subset of GPIO pins on Tiva devices, notably those used by the
+ JTAG/SWD interface and any pin capable of acting as an NMI input, are
+ locked against inadvertent reconfiguration.  These pins must be unlocked
+ using direct register writes to the relevant GPIO_O_LOCK and GPIO_O_CR
+ registers before this function can be called.  Please see the ``gpio_jtag''
+ example application for the mechanism required and consult your part
+ datasheet for information on affected pins.
+
+*/
+
 #include <stdint.h>
 #include <stdbool.h>
+#include <inc/hw_types.h> // <- DANCING WITH THE DEVIL HERE
 #include <inc/hw_memmap.h>
+#include <driverlib/pwm.h>
 #include <driverlib/gpio.h>
 #include <driverlib/timer.h>
+#include <driverlib/sysctl.h>
 #include <driverlib/pin_map.h>
 #include <driverlib/interrupt.h>
+
+// TODO::THE COMPILER IS FORCING ME TO PUT THIS HERE
+//       IT'S ALREADY DEFINED IN pin_map.h line 11829
+#define GPIO_PF1_M0PWM1         0x00050406
 
 /*
 this comes from the ms18 datasheet (20 microseconds)
@@ -56,7 +76,7 @@ void portf_isr(void)
 void pwm_isr(void)
 {
   PWMIntDisable(PWM0_BASE, PWM_INT_GEN_0);
-  PWMGenIntClear(PWM0_BASE, PWM_INT_GEN_0);
+  PWMGenIntClear(PWM0_BASE, PWM_INT_GEN_0, PWM_INT_CNT_ZERO | PWM_INT_CNT_LOAD); // TODO BULLETPROOF
 
   // handle left and right movements
   if(move_left)
@@ -66,11 +86,12 @@ void pwm_isr(void)
     }
   else if(move_right)
     {
-      // move sero right
+      // move servo right
       PWMPulseWidthSet(PWM0_BASE, PWM_OUT_1, right_rotate);
     }
   else
     {
+      // don't move at all TODO::BULLETPROOF THIS
       PWMPulseWidthSet(PWM0_BASE, PWM_OUT_1, 0.0);
     }
 
@@ -156,19 +177,44 @@ void timer_isr(void)
 /*
 pf0 <- sw2
 pf4 <- sw1
-pf1 <- pwm output 
+pf1 <- pwm output
 */
 void gpio_init(void)
 {
+  // SEND CLOCK TO PORTF
   SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
   while(!SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOF))
     {
     }
+
+  // UNLOCK PORTF pins 0,1,4
+  GPIOUnlockPin(GPIO_PORTF_BASE, GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_4);
+
+  // SET DIRECTIONS
   GPIOPinTypeGPIOInput(GPIO_PORTF_BASE, GPIO_PIN_0 | GPIO_PIN_4);
-  GPIOPinTypeGPIOPWM(GPIO_PORTF_BASE, GPIO_PIN_1);
+
+  // SET PIN TYPE PWM
+  GPIOPinTypePWM(GPIO_PORTF_BASE, GPIO_PIN_1);
+
+  // PULL UP RESISTORS
+  GPIOPadConfigSet(GPIO_PORTF_BASE,
+                   GPIO_PIN_0 | GPIO_PIN_4,
+                   GPIO_STRENGTH_2MA,
+                   GPIO_PIN_TYPE_STD_WPU);
+
+  // CONFIGURE THE PWM PIN
   GPIOPinConfigure(GPIO_PF1_M0PWM1);
+
+  //ENABLE GPIO INTERRUPTS FOR PF0 and PF4
+  GPIOIntEnable(GPIO_PORTF_BASE,
+                GPIO_INT_PIN_0 | GPIO_INT_PIN_4);
+
+  // REGISTER THE INTERRUPT HANDLER
+  GPIOIntRegister(GPIO_PORTF_BASE, portf_isr);
 }
 
+
+// TODO::THIS FUNCTION NEEDS COMMENTING AND WORK
 void pwm_init(void)
 {
   SysCtlPeripheralEnable(SYSCTL_PERIPH_PWM0);
@@ -176,7 +222,7 @@ void pwm_init(void)
     {
     }
   // divide by one here
-  SysCtlPwmClockSet(SYSCTL_PWMDIV_1);
+  SysCtlPWMClockSet(SYSCTL_PWMDIV_1);
   PWMGenConfigure(PWM0_BASE, PWM_GEN_0, PWM_GEN_MODE_DOWN);
   PWMGenPeriodSet(PWM0_BASE, PWM_GEN_0, pwm_period);
   PWMGenEnable(PWM0_BASE, PWM_GEN_0);
@@ -187,22 +233,28 @@ void pwm_init(void)
 
 void timer_init(void)
 {
+  // SEND CLOCK TO TIMER0
   SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);
   while(!SysCtlPeripheralReady(SYSCTL_PERIPH_TIMER0))
     {
     }
 
+  // SET THE SOURCE TO PIOSC
   TimerClockSourceSet(TIMER0_BASE, TIMER_CLOCK_PIOSC);
 
+  // DISABLE THE TIMER FOR INITIALIZATION
   TimerDisable(TIMER0_BASE, TIMER_BOTH);
 
+  // FULL WIDTH PERIODIC
   TimerConfigure(TIMER0_BASE, TIMER_CFG_PERIODIC);
 
   // 15 MILLISECOND DELAY
   TimerLoadSet(TIMER0_BASE, TIMER_A, 0x3A980);
 
+  // ENABLE THE INTERRUPT FOR TIMER0
   TimerIntEnable(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
 
+  // REGISTER THE INTERRUPT HANDLER
   TimerIntRegister(TIMER0_BASE, TIMER_A, timer_isr);
 }
 
@@ -215,8 +267,9 @@ void main(void)
   pwm_init();
 
   // ENABLE INTERRUPTS
+  IntMasterEnable();
+  IntPriorityMaskSet(0x0);
   PWMIntEnable(PWM0_BASE, PWM_INT_GEN_0);
-  GPIOIntEnable(GPIO_PORTF_BASE, sw1 | sw2);
 
   while(1)
     {
