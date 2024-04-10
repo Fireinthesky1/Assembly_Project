@@ -1,5 +1,3 @@
-// James Hicks Lab 5, October 5 2023
-
 // Displays and incrementing count
 // Pressing sw1 will pause the count
 // pressing sw2 will reset the count to zero
