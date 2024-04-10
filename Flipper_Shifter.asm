@@ -1,5 +1,3 @@
-; James Hicks Lab 3 October 2
-
         .thumb
         .global main
 
