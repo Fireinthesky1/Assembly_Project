@@ -1,5 +1,3 @@
-// James Hicks Lab 4, October 4 2023
-
 #include <stdbool.h>
 #include <stdint.h>
 #include <inc/hw_memmap.h>
